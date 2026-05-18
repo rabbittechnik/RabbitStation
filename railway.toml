@@ -1,0 +1,9 @@
+# Monorepo (Repo-Root): Railpack führt bereits `npm ci` im Install-Schritt aus.
+[build]
+builder = "railpack"
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm run start -w server"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300

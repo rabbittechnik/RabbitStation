@@ -11,6 +11,9 @@ server/dist/
 *.tsbuildinfo
 .turbo/
 .cache/
+.vite/
+**/.vite/
+client/.cache/
 
 # Environment (niemals committen)
 .env

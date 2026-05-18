@@ -2,9 +2,9 @@
 # oder Config-as-Code-Pfad: client/railway.toml
 [build]
 builder = "railpack"
-buildCommand = "npm ci --include=dev && npm run build"
+buildCommand = "npm run build"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "npm run start"
 healthcheckPath = "/"
 healthcheckTimeout = 300

@@ -29,6 +29,8 @@ const port =
 
 // https://vite.dev/config/
 export default defineConfig({
+  /** Außerhalb von node_modules, damit paralleles `npm ci` auf Railway nicht EBUSY auf .vite wirft. */
+  cacheDir: path.resolve(process.cwd(), '.cache/vite'),
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_TIME_ISO__: JSON.stringify(new Date().toISOString()),

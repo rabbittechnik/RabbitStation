@@ -2,7 +2,7 @@
 # oder Config-as-Code-Pfad: server/railway.toml
 [build]
 builder = "railpack"
-buildCommand = "npm ci --include=dev && npm run build"
+buildCommand = "npm run build"
 
 [deploy]
 startCommand = "npm start"
