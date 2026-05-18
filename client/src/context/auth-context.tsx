@@ -55,6 +55,21 @@ export type AuthUser = {
   stations?: StationInfo[]
   stationAccess?: StationAccessInfo[]
   canSwitchStation?: boolean
+  tenantId?: string
+  platformRole?: string
+  setupRequired?: boolean
+  subscription?: {
+    canWrite: boolean
+    status: string
+    trialDaysLeft: number | null
+    message: string | null
+  }
+  tenant?: {
+    companyName: string
+    subscriptionStatus: string
+    trialDaysLeft: number | null
+    setupCompleted: boolean
+  }
 }
 
 type AuthContextValue = {

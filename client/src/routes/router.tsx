@@ -51,6 +51,17 @@ import { EmployeeAppLayout } from '../layouts/EmployeeAppLayout'
 import { EmployeeAccessPage } from '../pages/employee-app/EmployeeAccessPage'
 import { EmployeeAppPage } from '../pages/employee-app/EmployeeAppPage'
 import { LandingChoicePage } from '../pages/employee-app/LandingChoicePage'
+import { MarketingLayout } from '../layouts/MarketingLayout'
+import {
+  MarketingDemoPage,
+  MarketingFeaturesPage,
+  MarketingHomePage,
+  MarketingLegalPage,
+  MarketingPricingPage,
+} from '../pages/marketing/MarketingPages'
+import { RegisterPage } from '../pages/auth/RegisterPage'
+import { SetupPage } from '../pages/setup/SetupPage'
+import { TabletPairPage } from '../pages/terminal/TabletPairPage'
 import { AppHubPage } from '../pages/app/AppHubPage'
 import { SavedLocalAccessPage } from '../pages/app/SavedLocalAccessPage'
 import { TimeApprovalsPage } from '../pages/time-approvals/TimeApprovalsPage'
@@ -100,6 +111,21 @@ function LegacyEmployeeAccessToEmployee() {
 
 export const router = createBrowserRouter([
   {
+    element: <MarketingLayout />,
+    children: [
+      { index: true, element: <MarketingHomePage /> },
+      { path: 'funktionen', element: <MarketingFeaturesPage /> },
+      { path: 'preise', element: <MarketingPricingPage /> },
+      { path: 'demo', element: <MarketingDemoPage /> },
+      { path: 'datenschutz', element: <MarketingLegalPage kind="privacy" /> },
+      { path: 'impressum', element: <MarketingLegalPage kind="imprint" /> },
+      { path: 'agb', element: <MarketingLegalPage kind="terms" /> },
+    ],
+  },
+  { path: '/registrieren', element: <RegisterPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  { path: '/setup', element: <SetupPage /> },
+  {
     path: '/login',
     element: <AuthLayout />,
     children: [{ index: true, element: <LoginPage /> }],
@@ -134,6 +160,7 @@ export const router = createBrowserRouter([
     path: '/tablet',
     element: <TabletLandingPage />,
   },
+  { path: '/tablet/pair', element: <TabletPairPage /> },
   {
     path: '/tablet/dev',
     element: (
@@ -162,37 +189,29 @@ export const router = createBrowserRouter([
     path: '/staff-terminal',
     element: <Navigate to={import.meta.env.PROD ? '/tablet' : '/tablet/dev'} replace />,
   },
+  { path: '/start', element: <LandingChoicePage /> },
   {
-    path: '/',
-    element: <Outlet />,
+    element: (
+      <RequireAuth>
+        <SidebarProvider>
+          <WorkAreasProvider>
+            <EmployeesProvider>
+              <ScheduleShiftsProvider>
+                <AbsencesProvider>
+                  <TimeTrackingProvider>
+                    <Outlet />
+                  </TimeTrackingProvider>
+                </AbsencesProvider>
+              </ScheduleShiftsProvider>
+            </EmployeesProvider>
+          </WorkAreasProvider>
+        </SidebarProvider>
+      </RequireAuth>
+    ),
     children: [
-      { index: true, element: <LandingChoicePage /> },
       {
-        element: (
-          <RequireAuth>
-            <SidebarProvider>
-              <WorkAreasProvider>
-                <EmployeesProvider>
-                  <ScheduleShiftsProvider>
-                    <AbsencesProvider>
-                      <TimeTrackingProvider>
-                        <Outlet />
-                      </TimeTrackingProvider>
-                    </AbsencesProvider>
-                  </ScheduleShiftsProvider>
-                </EmployeesProvider>
-              </WorkAreasProvider>
-            </SidebarProvider>
-          </RequireAuth>
-        ),
+        element: <AppLayout />,
         children: [
-          {
-            element: <AppLayout />,
-            children: [
-      {
-        index: true,
-        element: <Navigate to="/dashboard" replace />,
-      },
       {
         path: 'dashboard',
         element: <DashboardPage />,
@@ -485,8 +504,6 @@ export const router = createBrowserRouter([
         element: <Navigate to="/reports/payroll-time" replace />,
         handle: { title: 'Zeiterfassung' },
       },
-            ],
-          },
         ],
       },
     ],

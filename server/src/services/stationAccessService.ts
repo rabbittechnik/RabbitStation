@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { KNOWN_STATIONS } from '../constants/stationIds.js'
 import { TEAMLEAD_PERMISSIONS } from '../constants/permissions.js'
 import { mathiasStationsleiterPermissions } from '../constants/mathiasStationsleiterPermissions.js'
+import { isPlatformRole } from '../constants/saasRoles.js'
 
 const VISIBLE_IN_DROPDOWN_SQL = `(active IS NULL OR active = 1) AND (deleted_at IS NULL OR trim(deleted_at) = '')`
 
@@ -21,6 +22,8 @@ export type UserStationAccessRow = {
 export type AccessContext = {
   userId: string
   globalAdmin: boolean
+  tenantId: string | null
+  isPlatformAdmin: boolean
   /** Erlaubte Station-IDs (immer aktiv laut DB). */
   stationIds: string[]
   /** stationId → geparste Berechtigungen */
@@ -44,18 +47,31 @@ function parsePermissionsJson(raw: string | null | undefined): Record<string, bo
 
 export function buildAccessContext(db: Database, userId: string): AccessContext {
   const u = db
-    .prepare(`SELECT id, COALESCE(global_admin, 0) as ga FROM users WHERE id = ?`)
-    .get(userId) as { id: string; ga: number } | undefined
+    .prepare(
+      `SELECT id, COALESCE(global_admin, 0) as ga, tenant_id, platform_role FROM users WHERE id = ?`,
+    )
+    .get(userId) as
+    | { id: string; ga: number; tenant_id: string | null; platform_role: string | null }
+    | undefined
   const globalAdmin = (u?.ga ?? 0) === 1
+  const tenantId = u?.tenant_id?.trim() || null
+  const isPlatformAdmin = isPlatformRole(u?.platform_role?.trim())
 
   if (globalAdmin) {
-    const all = db
-      .prepare(`SELECT id FROM stations WHERE ${VISIBLE_IN_DROPDOWN_SQL} ORDER BY name`)
-      .all() as { id: string }[]
+    const all =
+      isPlatformAdmin || !tenantId ?
+        (db
+          .prepare(`SELECT id FROM stations WHERE ${VISIBLE_IN_DROPDOWN_SQL} ORDER BY name`)
+          .all() as { id: string }[])
+      : (db
+          .prepare(`SELECT id FROM stations WHERE ${VISIBLE_IN_DROPDOWN_SQL} AND tenant_id = ? ORDER BY name`)
+          .all(tenantId) as { id: string }[])
     const stationIds = all.map((r) => r.id)
     return {
       userId,
       globalAdmin: true,
+      tenantId,
+      isPlatformAdmin,
       stationIds,
       permissionsByStation: new Map(),
       roleByStation: new Map(),
@@ -64,9 +80,12 @@ export function buildAccessContext(db: Database, userId: string): AccessContext 
 
   const rows = db
     .prepare(
-      `SELECT * FROM user_station_access WHERE user_id = ? AND (active IS NULL OR active = 1)`,
+      `SELECT usa.* FROM user_station_access usa
+       JOIN stations s ON s.id = usa.station_id
+       WHERE usa.user_id = ? AND (usa.active IS NULL OR usa.active = 1)
+         AND (? IS NULL OR s.tenant_id = ?)`,
     )
-    .all(userId) as UserStationAccessRow[]
+    .all(userId, tenantId, tenantId) as UserStationAccessRow[]
 
   const stationIds: string[] = []
   const permissionsByStation = new Map<string, Record<string, boolean>>()
@@ -77,12 +96,21 @@ export function buildAccessContext(db: Database, userId: string): AccessContext 
     permissionsByStation.set(r.station_id, parsePermissionsJson(r.permissions_json))
     roleByStation.set(r.station_id, r.role ?? 'teamleiter')
   }
-  return { userId, globalAdmin: false, stationIds, permissionsByStation, roleByStation }
+  return { userId, globalAdmin: false, tenantId, isPlatformAdmin, stationIds, permissionsByStation, roleByStation }
 }
 
-export function canAccessStation(ctx: AccessContext, stationId: string): boolean {
+export function canAccessStation(ctx: AccessContext, stationId: string, db?: Database): boolean {
   if (!stationId) return false
-  if (ctx.globalAdmin) return true
+  if (ctx.globalAdmin) {
+    if (!ctx.tenantId || ctx.isPlatformAdmin) return true
+    if (db) {
+      const tid = db.prepare(`SELECT tenant_id FROM stations WHERE id = ?`).get(stationId) as
+        | { tenant_id: string | null }
+        | undefined
+      return (tid?.tenant_id?.trim() || null) === ctx.tenantId
+    }
+    return ctx.stationIds.includes(stationId)
+  }
   return ctx.stationIds.includes(stationId)
 }
 

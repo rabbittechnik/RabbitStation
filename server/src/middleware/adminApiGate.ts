@@ -2,16 +2,20 @@ import type { NextFunction, Request, Response } from 'express'
 import { verifyAdminToken } from '../services/authService.js'
 import { getDb } from '../db/database.js'
 import { buildAccessContext } from '../services/stationAccessService.js'
+import { trialWriteGate } from './trialWriteGate.js'
 
 /**
- * Schützt alle /api/* Routen außer Health, Login, Mitarbeiter-Zugang und Terminal.
+ * Schützt alle /api/* Routen außer Health, Login, Public, Mitarbeiter-Zugang und Terminal.
  */
 export function adminApiGate(req: Request, res: Response, next: NextFunction) {
   const p = (req.originalUrl ?? req.url ?? '').split('?')[0] || req.path
   if (p === '/api/health') return next()
+  if (p.startsWith('/api/public')) return next()
   if (p === '/api/auth/login') return next()
+  if (p === '/api/auth/forgot-password' || p === '/api/auth/reset-password') return next()
   if (p.startsWith('/api/employee-access')) return next()
   if (p.startsWith('/api/terminal')) return next()
+  if (p === '/api/tablet/pair' || p.startsWith('/api/tablet/session')) return next()
   if (p.startsWith('/api/tablet')) return next()
   if (p.startsWith('/api/fuel-prices')) return next()
 
@@ -37,5 +41,5 @@ export function adminApiGate(req: Request, res: Response, next: NextFunction) {
   }
   req.accessContext = buildAccessContext(getDb(), payload.sub)
   req.adminUser = payload
-  next()
+  trialWriteGate(req, res, next)
 }

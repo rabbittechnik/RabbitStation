@@ -28,6 +28,10 @@ import { minimumWageRouter } from './routes/minimumWage.routes.js'
 import { backshopRoutinesRouter } from './routes/backshop.routes.js'
 import { stationExtraHolidaysRouter } from './routes/stationExtraHolidays.routes.js'
 import { stationHubRouter } from './routes/stationHub.routes.js'
+import { publicRouter } from './routes/public.routes.js'
+import { tenantRouter } from './routes/tenant.routes.js'
+import { setupRouter } from './routes/setup.routes.js'
+import { platformAdminRouter } from './routes/platformAdmin.routes.js'
 
 function parseCorsOrigins(): boolean | string[] {
   const raw = process.env.CLIENT_ORIGIN?.trim()
@@ -46,12 +50,16 @@ export function createApp() {
   app.use(express.json({ limit: '2mb' }))
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, service: 'neonshift-server' })
+    res.json({ ok: true, service: 'rabbitstation-pro', product: process.env.APP_NAME ?? 'RabbitStation Pro' })
   })
 
+  app.use('/api/public', publicRouter)
   app.use(adminApiGate)
 
   app.use('/api/auth', authRouter)
+  app.use('/api/tenant', tenantRouter)
+  app.use('/api/setup', setupRouter)
+  app.use('/api/admin', platformAdminRouter)
   app.use('/api/employee-access', employeeAccessRouter)
   app.use('/api/terminal', terminalRouter)
   app.use('/api/tablet', tabletRouter)

@@ -1,7 +1,13 @@
 import { Router } from 'express'
 import { getDb } from '../db/database.js'
 import { jsonErr, jsonOk } from '../utils/http.js'
-import { loginAdminUser, buildAuthMeUser, findUserByUsername, updateAdminUserProfile } from '../services/authService.js'
+import {
+  loginAdminUser,
+  buildAuthMeUser,
+  findUserByUsername,
+  updateAdminUserProfile,
+} from '../services/authService.js'
+import { createPasswordResetToken, resetPasswordWithToken } from '../services/registrationService.js'
 import { appendUserAudit } from '../services/userAuditLogService.js'
 
 export const authRouter = Router()
@@ -46,6 +52,33 @@ authRouter.get('/me', (req, res) => {
     return
   }
   jsonOk(res, me)
+})
+
+authRouter.post('/logout', (req, res) => {
+  if (req.adminUser) {
+    try {
+      appendUserAudit(getDb(), { userId: req.adminUser.sub, action: 'logout', createdBy: req.adminUser.sub })
+    } catch {
+      /* ignore */
+    }
+  }
+  jsonOk(res, { ok: true })
+})
+
+authRouter.post('/forgot-password', (req, res) => {
+  const email = String((req.body as { email?: string })?.email ?? '').trim()
+  createPasswordResetToken(getDb(), email)
+  jsonOk(res, { ok: true, message: 'Falls ein Konto existiert, wurde eine E-Mail vorbereitet.' })
+})
+
+authRouter.post('/reset-password', (req, res) => {
+  try {
+    const body = req.body as { token?: string; password?: string }
+    resetPasswordWithToken(getDb(), String(body.token ?? ''), String(body.password ?? ''))
+    jsonOk(res, { ok: true })
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
+  }
 })
 
 authRouter.put('/me', (req, res) => {

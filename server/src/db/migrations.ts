@@ -17,6 +17,7 @@ import { ensureStationDocumentTemplates } from '../services/stationDocumentServi
 import { seedAralBodelshausenRepresentatives } from '../services/representativeSeedService.js'
 import { shouldRunLegacyRealStationMigrations } from '../constants/demoMigrationGuard.js'
 import { DEMO_STATION_ID } from '../constants/demo.js'
+import { runSaasMigrations } from './saasMigrations.js'
 
 function employeesColumnNames(db: Database.Database): Set<string> {
   const rows = db.prepare(`PRAGMA table_info(employees)`).all() as { name: string }[]
@@ -222,6 +223,7 @@ export function runMigrations(db: Database.Database) {
   ensureEmployeePayrollDocumentsTable(db)
   mergeEmployeePayrollDocumentsPermissionsIntoAccess(db)
   ensureSteveScheifenEmployee(db)
+  runSaasMigrations(db)
 }
 
 function migrateEmployeePlanningRulesColumns(db: Database.Database) {

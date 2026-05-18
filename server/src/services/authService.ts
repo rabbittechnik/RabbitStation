@@ -8,6 +8,9 @@ import {
 } from './stationAccessService.js'
 import { nowIso } from '../utils/timestamps.js'
 import { appendUserAudit } from './userAuditLogService.js'
+import { getUserTenantContext, getTenantById, tenantToApi } from './tenantService.js'
+import { getSubscriptionWriteState, getTrialMessage } from './subscriptionService.js'
+import { appendTenantAudit } from './tenantAuditService.js'
 
 export type AuthUserRow = {
   id: string
@@ -26,6 +29,9 @@ export type JwtPayload = {
   username: string
   displayName: string
   roleId: string
+  tenantId?: string | null
+  roleKey?: string | null
+  platformRole?: string | null
 }
 
 export function signAdminToken(payload: JwtPayload, rememberMe: boolean): string {
@@ -36,6 +42,9 @@ export function signAdminToken(payload: JwtPayload, rememberMe: boolean): string
       username: payload.username,
       displayName: payload.displayName,
       roleId: payload.roleId,
+      tenantId: payload.tenantId ?? null,
+      roleKey: payload.roleKey ?? null,
+      platformRole: payload.platformRole ?? null,
     },
     JWT_SECRET,
     { expiresIn },
@@ -51,6 +60,9 @@ export function verifyAdminToken(token: string): JwtPayload | null {
       username: String(decoded.username ?? ''),
       displayName: String(decoded.displayName ?? ''),
       roleId: String(decoded.roleId ?? ''),
+      tenantId: decoded.tenantId != null ? String(decoded.tenantId) : null,
+      roleKey: decoded.roleKey != null ? String(decoded.roleKey) : null,
+      platformRole: decoded.platformRole != null ? String(decoded.platformRole) : null,
     }
   } catch {
     return null
@@ -128,6 +140,29 @@ export function buildAuthMeUser(db: Database, userId: string) {
   const canSwitchStation = ctx.globalAdmin || ctx.stationIds.length > 1
   const roleKey = row.role_key?.trim() || undefined
   const roleLabel = row.role_label?.trim() || undefined
+  const tenantCtx = getUserTenantContext(db, userId)
+  let tenant: ReturnType<typeof tenantToApi> | undefined
+  let subscription:
+    | {
+        canWrite: boolean
+        status: string
+        trialDaysLeft: number | null
+        message: string | null
+      }
+    | undefined
+  if (tenantCtx?.tenantId) {
+    const t = getTenantById(db, tenantCtx.tenantId)
+    if (t) {
+      tenant = tenantToApi(t)
+      const ws = getSubscriptionWriteState(t)
+      subscription = {
+        canWrite: ws.canWrite,
+        status: ws.status,
+        trialDaysLeft: ws.trialDaysLeft,
+        message: getTrialMessage(ws),
+      }
+    }
+  }
   return {
     id: row.id,
     username: row.username ?? '',
@@ -138,9 +173,30 @@ export function buildAuthMeUser(db: Database, userId: string) {
     roleKey,
     roleLabel,
     globalAdmin: ctx.globalAdmin,
+    platformRole: tenantCtx?.platformRole ?? undefined,
+    tenantId: tenantCtx?.tenantId ?? undefined,
+    tenant,
+    subscription,
+    setupRequired: tenant ? !tenant.setupCompleted : false,
     stations,
     stationAccess,
     canSwitchStation,
+  }
+}
+
+function jwtPayloadForUser(db: Database, row: AuthUserRow): JwtPayload {
+  const tenantCtx = getUserTenantContext(db, row.id)
+  const role = db.prepare(`SELECT role_key FROM roles WHERE id = ?`).get(row.role_id ?? '') as
+    | { role_key: string | null }
+    | undefined
+  return {
+    sub: row.id,
+    username: row.username ?? '',
+    displayName: row.display_name ?? '',
+    roleId: row.role_id ?? '',
+    tenantId: tenantCtx?.tenantId ?? null,
+    roleKey: role?.role_key ?? tenantCtx?.roleKey ?? null,
+    platformRole: tenantCtx?.platformRole ?? null,
   }
 }
 
@@ -155,15 +211,7 @@ export function loginAdminUser(
   if (!row || !verifyPassword(row, password)) {
     throw new Error('Anmeldung fehlgeschlagen')
   }
-  const token = signAdminToken(
-    {
-      sub: row.id,
-      username: row.username ?? '',
-      displayName: row.display_name ?? '',
-      roleId: row.role_id ?? '',
-    },
-    Boolean(body.rememberMe),
-  )
+  const token = signAdminToken(jwtPayloadForUser(db, row), Boolean(body.rememberMe))
   const user = buildAuthMeUser(db, row.id)
   if (!user) throw new Error('Benutzerdaten fehlen')
   const ts = nowIso()
@@ -174,6 +222,14 @@ export function loginAdminUser(
   }
   try {
     appendUserAudit(db, { userId: row.id, action: 'login.success', createdBy: row.id })
+    const tc = getUserTenantContext(db, row.id)
+    appendTenantAudit(db, {
+      tenantId: tc?.tenantId,
+      userId: row.id,
+      action: 'login.success',
+      entityType: 'user',
+      entityId: row.id,
+    })
   } catch {
     /* ignore */
   }

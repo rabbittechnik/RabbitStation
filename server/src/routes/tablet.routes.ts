@@ -15,8 +15,20 @@ import { buildTabletCheckInSuggestions } from '../services/tabletCheckInSuggesti
 import { confirmTaskFromTablet } from '../services/taskService.js'
 import type { StationTabletDeviceRow } from '../services/stationTabletDeviceService.js'
 import { touchTabletByToken } from '../services/stationTabletDeviceService.js'
+import { pairTabletWithCode } from '../services/tabletPairingService.js'
 
 export const tabletRouter = Router()
+
+tabletRouter.post('/pair', (req, res) => {
+  try {
+    const code = String((req.body as { code?: string })?.code ?? '').trim()
+    if (!code) return jsonErr(res, 'Pairing-Code erforderlich', 400)
+    const out = pairTabletWithCode(getDb(), code)
+    jsonOk(res, out)
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Pairing fehlgeschlagen', 400)
+  }
+})
 
 function stationRadioFromRow(st: Record<string, unknown>) {
   const enabled = st.radio_enabled == null || Number(st.radio_enabled) === 1

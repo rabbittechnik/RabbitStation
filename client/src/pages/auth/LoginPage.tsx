@@ -45,8 +45,8 @@ export function LoginPage() {
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-br from-cyan-400/25 to-fuchsia-500/20 ring-1 ring-cyan-400/45">
           <Zap className="h-7 w-7 text-cyan-200" aria-hidden />
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">Rabbit-Technik Station</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">Anmeldung für Stationsleitung und Team</p>
+        <h1 className="text-xl font-semibold tracking-tight">RabbitStation Pro</h1>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">Anmeldung für Betreiber und Team</p>
       </div>
 
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
@@ -102,6 +102,12 @@ export function LoginPage() {
           Zugang nur für autorisierte Stationsleitung.
         </p>
       </form>
+      <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
+        Noch kein Konto?{' '}
+        <Link to="/registrieren" className="text-cyan-400 hover:underline">
+          7 Tage kostenlos testen
+        </Link>
+      </p>
     </Card>
   )
 }

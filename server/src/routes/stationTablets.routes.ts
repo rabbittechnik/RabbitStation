@@ -11,6 +11,8 @@ import {
   regenerateStationTabletToken,
   updateStationTablet,
 } from '../services/stationTabletDeviceService.js'
+import { createPairingCode } from '../services/tabletPairingService.js'
+import { getUserTenantContext } from '../services/tenantService.js'
 
 export const stationTabletsRouter = Router()
 
@@ -133,6 +135,28 @@ stationTabletsRouter.delete('/:id', (req, res) => {
     if (!requireAnyPermission(req, res, stationId, [...MANAGE_KEYS])) return
     const { hardDeleted } = deleteStationTablet(getDb(), id, stationId)
     jsonOk(res, { ok: true, hardDeleted })
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
+  }
+})
+
+stationTabletsRouter.post('/pairing-code', (req, res) => {
+  try {
+    const body = (req.body ?? {}) as { stationId?: string }
+    const stationId = typeof body.stationId === 'string' ? body.stationId.trim() : ''
+    if (!requireAnyPermission(req, res, stationId, [...MANAGE_KEYS])) return
+    const ctx = getAccess(req)
+    const tenantCtx = getUserTenantContext(getDb(), ctx!.userId)
+    if (!tenantCtx?.tenantId) {
+      jsonErr(res, 'Kein Tenant', 400)
+      return
+    }
+    const out = createPairingCode(getDb(), {
+      tenantId: tenantCtx.tenantId,
+      stationId,
+      userId: ctx!.userId,
+    })
+    jsonOk(res, out)
   } catch (e) {
     jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
   }
