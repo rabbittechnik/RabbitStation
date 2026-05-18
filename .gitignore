@@ -12,7 +12,7 @@ server/dist/
 .turbo/
 .cache/
 
-# Environment (keep .env.example if you add one)
+# Environment (niemals committen)
 .env
 .env.*
 !.env.example
@@ -41,12 +41,28 @@ Thumbs.db
 *.sln
 *.sw?
 
-server/data/*.sqlite
-server/data/*.sqlite-wal
-server/data/*.sqlite-shm
+# Datenbanken (Echtdaten nicht ins Repo)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+server/data/
+/data/
 
-# Lokale Test-/Seed-Datenbanken (Repo-Root)
-/data/*.sqlite
-/data/*.sqlite-wal
-/data/*.sqlite-shm
+# Uploads / Exporte / Backups
+uploads/
+public/uploads/
+storage/
+server/data/absence-uploads/
+server/data/documents/
+server/data/exports/
+exports/
+generated/
+backups/
 
+# PDFs und Office-Dateien mit potenziellen Echtdaten
+*.pdf
+*.xlsx
+*.xls
+*.csv
+!docs/**/*.md

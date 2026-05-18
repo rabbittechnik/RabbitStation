@@ -9,12 +9,7 @@ import {
 
 const STATION_ID = DEFAULT_STATION_ID
 
-const NAME_ALIASES: Record<string, string> = {
-  'm. vins': 'Max Vins',
-  'm vins': 'Max Vins',
-  'm. raselowski': 'Mathias Raselowski',
-  'm raselowski': 'Mathias Raselowski',
-}
+const NAME_ALIASES: Record<string, string> = {}
 
 function normalizeEmployeeName(input: string): string {
   const t = input.trim()

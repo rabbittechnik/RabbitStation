@@ -31,8 +31,11 @@ export const DEFAULT_STATION_PAYROLL_SURCHARGE_RULES: StationPayrollSurchargeRul
   onlySundayAndHolidaySupplements: false,
 }
 
-/** Aral Bodelshausen: nur Sonntags- und Feiertagszuschläge — keine Nacht-/Früh-/Spät-/Samstagszuschläge. */
-export const ARAL_BODELSHAUSEN_PAYROLL_SURCHARGE_RULES: StationPayrollSurchargeRules = {
+/**
+ * Demo-Station / Referenz-Preset: nur Sonntags- und Feiertagszuschläge (125 % / B-Feiertag 150 %).
+ * Keine Nacht-/Früh-/Spät-/Samstagszuschläge — Berechnungslogik bleibt erhalten.
+ */
+export const DEMO_STATION_PAYROLL_SURCHARGE_RULES: StationPayrollSurchargeRules = {
   normalWeekdayNightBonusEnabled: false,
   normalWeekdayEveningBonusEnabled: false,
   saturdaySurchargeEnabled: false,
@@ -41,6 +44,9 @@ export const ARAL_BODELSHAUSEN_PAYROLL_SURCHARGE_RULES: StationPayrollSurchargeR
   defaultSpecialHolidayPercent: 150,
   onlySundayAndHolidaySupplements: true,
 }
+
+/** @deprecated Alias – nutze DEMO_STATION_PAYROLL_SURCHARGE_RULES */
+export const ARAL_BODELSHAUSEN_PAYROLL_SURCHARGE_RULES = DEMO_STATION_PAYROLL_SURCHARGE_RULES
 
 export function stationSurchargePolicySummaryDe(rules: StationPayrollSurchargeRules): string[] {
   if (rules.onlySundayAndHolidaySupplements) {

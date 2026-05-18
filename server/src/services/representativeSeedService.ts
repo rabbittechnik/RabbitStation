@@ -1,9 +1,12 @@
 import type { Database } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
-import { ARAL_BODELSHAUSEN_REPRESENTATIVE_SEEDS, type RepresentativeSeedEntry } from '../data/representativeSeedCatalog.js'
+import {
+  DEMO_REPRESENTATIVE_SEEDS,
+  type RepresentativeSeedEntry,
+} from '../data/representativeSeedCatalog.js'
+import { DEMO_STATION_ID } from '../constants/demo.js'
+import { shouldRunLegacyRealStationMigrations } from '../constants/demoMigrationGuard.js'
 import { nowIso } from '../utils/timestamps.js'
-
-const BODELSHAUSEN_ID = 'aral-bodelshausen'
 
 function norm(s: string): string {
   return s.trim().toLowerCase()
@@ -99,9 +102,12 @@ function upsertSeed(db: Database, stationId: string, seed: RepresentativeSeedEnt
   return 'inserted'
 }
 
-/** Legt/aktualisiert Startkontakte für Aral Bodelshausen (idempotent). */
-export function seedAralBodelshausenRepresentatives(db: Database): { inserted: number; updated: number } {
-  const station = db.prepare(`SELECT id FROM stations WHERE id = ?`).get(BODELSHAUSEN_ID) as { id: string } | undefined
+function seedRepresentativesForStation(
+  db: Database,
+  stationId: string,
+  seeds: RepresentativeSeedEntry[],
+): { inserted: number; updated: number } {
+  const station = db.prepare(`SELECT id FROM stations WHERE id = ?`).get(stationId) as { id: string } | undefined
   if (!station) return { inserted: 0, updated: 0 }
 
   let inserted = 0
@@ -109,15 +115,28 @@ export function seedAralBodelshausenRepresentatives(db: Database): { inserted: n
   const ts = nowIso()
   const seen = new Set<string>()
 
-  for (const s of ARAL_BODELSHAUSEN_REPRESENTATIVE_SEEDS) {
+  for (const s of seeds) {
     const dedupeKey = `${norm(s.company)}|${norm(s.name)}`
     if (seen.has(dedupeKey)) continue
     seen.add(dedupeKey)
 
-    const result = upsertSeed(db, BODELSHAUSEN_ID, s, ts)
+    const result = upsertSeed(db, stationId, s, ts)
     if (result === 'inserted') inserted += 1
     else updated += 1
   }
 
   return { inserted, updated }
+}
+
+/** Demo-Vertreter für die neutrale Entwicklungsstation. */
+export function seedDemoRepresentatives(db: Database): { inserted: number; updated: number } {
+  return seedRepresentativesForStation(db, DEMO_STATION_ID, DEMO_REPRESENTATIVE_SEEDS)
+}
+
+/** @deprecated Nur wenn Legacy-Station noch in der DB – sonst no-op */
+export function seedAralBodelshausenRepresentatives(db: Database): { inserted: number; updated: number } {
+  if (!shouldRunLegacyRealStationMigrations(db)) {
+    return seedDemoRepresentatives(db)
+  }
+  return seedRepresentativesForStation(db, 'aral-bodelshausen', DEMO_REPRESENTATIVE_SEEDS)
 }

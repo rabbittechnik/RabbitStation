@@ -11,7 +11,7 @@ let dbInstance: Database.Database | null = null
 
 export function getDbPath(): string {
   if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH
-  return path.join(process.cwd(), 'data', 'neonshift.sqlite')
+  return path.join(process.cwd(), 'data', 'demo.sqlite')
 }
 
 export function getDb(): Database.Database {

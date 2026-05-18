@@ -58,7 +58,7 @@ export function terminalCheckIn(
   db: Database,
   body: { cardNumber?: string; employeeId?: string; stationId: string; force?: boolean; shiftId?: string },
 ) {
-  const stationId = body.stationId || 'aral-bodelshausen'
+  const stationId = body.stationId || 'demo-station-sued'
   const force = Boolean(body.force)
   const shiftId = String(body.shiftId ?? '').trim() || undefined
   const res = resolveEmployeeForTerminal(db, stationId, body, 'check_in')
@@ -89,7 +89,7 @@ export function terminalCheckOutStart(
   db: Database,
   body: { cardNumber?: string; employeeId?: string; stationId: string },
 ) {
-  const stationId = body.stationId || 'aral-bodelshausen'
+  const stationId = body.stationId || 'demo-station-sued'
   const res = resolveEmployeeForTerminal(db, stationId, body, 'check_out')
   if (!res.ok) {
     const card = String(body.cardNumber ?? '').trim()
@@ -174,7 +174,7 @@ export function terminalAckBakingNotice(
     items?: string[]
   },
 ): { ok: true } | { ok: false; error: string } {
-  const stationId = String(body.stationId ?? '').trim() || 'aral-bodelshausen'
+  const stationId = String(body.stationId ?? '').trim() || 'demo-station-sued'
   const timeEntryId = String(body.timeEntryId ?? '').trim()
   if (!timeEntryId) return { ok: false, error: 'Angaben unvollständig.' }
   const te = getTimeEntry(db, timeEntryId)
@@ -218,7 +218,7 @@ export function terminalCheckOutFull(
     earlyLeaveAck?: { reason: string; note?: string | null }
   },
 ) {
-  const stationId = body.stationId || 'aral-bodelshausen'
+  const stationId = body.stationId || 'demo-station-sued'
   const employeeId = String(body.employeeId ?? '').trim()
   if (!employeeId) {
     return { ok: false as const, error: 'employeeId erforderlich' }
@@ -274,7 +274,7 @@ export function terminalAcknowledgeShiftWarning(
   db: Database,
   body: { cardNumber?: string; employeeId?: string; stationId: string; warningId: string },
 ) {
-  const stationId = body.stationId || 'aral-bodelshausen'
+  const stationId = body.stationId || 'demo-station-sued'
   const warningId = String(body.warningId ?? '').trim()
   if (!warningId) {
     return { ok: false as const, message: 'warningId erforderlich' }

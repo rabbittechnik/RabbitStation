@@ -15,6 +15,8 @@ import { seedTaskTemplatesIfMissing } from '../services/taskTemplateService.js'
 import { ensureStationStatutoryHolidaysSeeded } from '../services/stationExtraHolidayService.js'
 import { ensureStationDocumentTemplates } from '../services/stationDocumentService.js'
 import { seedAralBodelshausenRepresentatives } from '../services/representativeSeedService.js'
+import { shouldRunLegacyRealStationMigrations } from '../constants/demoMigrationGuard.js'
+import { DEMO_STATION_ID } from '../constants/demo.js'
 
 function employeesColumnNames(db: Database.Database): Set<string> {
   const rows = db.prepare(`PRAGMA table_info(employees)`).all() as { name: string }[]
@@ -156,7 +158,9 @@ export function runMigrations(db: Database.Database) {
   ensureKnownStationsAndWorkAreas(db, bootTs)
   ensureDefaultUserStationAccess(db, bootTs)
 
-  db.prepare(`UPDATE stations SET brand = COALESCE(brand, 'Aral') WHERE id = 'aral-bodelshausen' AND (brand IS NULL OR trim(brand) = '')`).run()
+  if (shouldRunLegacyRealStationMigrations(db)) {
+    db.prepare(`UPDATE stations SET brand = COALESCE(brand, 'Aral') WHERE id = 'aral-bodelshausen' AND (brand IS NULL OR trim(brand) = '')`).run()
+  }
 
   mergeTuvPermissionsIntoAccess(db)
   mergeEmployeeSensitivePermissionsIntoAccess(db)
@@ -208,6 +212,7 @@ export function runMigrations(db: Database.Database) {
   ensureStationBreakPolicyColumnsAndZeroBodelshausenBreaks(db)
   ensureStationPayrollSurchargeRuleColumns(db)
   ensureBodelshausenSundayHolidaySurchargePolicy(db)
+  ensureDemoStationSundayHolidaySurchargePolicy(db)
   ensurePayrollQueryIndexes(db)
   ensureStationHolidayPayrollColumns(db)
   ensureStationDocumentTemplateColumns(db)
@@ -236,6 +241,7 @@ function migrateEmployeePlanningRulesColumns(db: Database.Database) {
 
 /** Neuer Mitarbeiter Steve Scheifen (nur anlegen, wenn noch nicht vorhanden). */
 function ensureSteveScheifenEmployee(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const sid = 'aral-bodelshausen'
   const existing = db
     .prepare(
@@ -432,6 +438,7 @@ function ensureTimeEntryCorrections2026(db: Database.Database) {
 
 /** Idempotent: StationGuide-Urlaube Aral Bodelshausen (Apr–Jun 2026), nur wenn Mitarbeiter existieren. */
 function ensureStationGuideVacationsBodelshausen2026Migration(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const n = db
     .prepare(
       `SELECT COUNT(*) as n FROM employees WHERE station_id = 'aral-bodelshausen' AND (deleted_at IS NULL OR trim(deleted_at) = '')`,
@@ -473,6 +480,7 @@ function migrateWeekendTaskTemplateSlugsToKeys(db: Database.Database) {
 
 /** Idempotent: Kassenkartennummern für Aral Bodelshausen (nur nicht gelöschte Zeilen, Abgleich per display_name). */
 function syncAralBodelshausenEmployeeCashRegisterCards(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const ts = nowIso()
   const pairs: [string, string][] = [
     ['Mathias Raselowski', '772839'],
@@ -494,6 +502,7 @@ function syncAralBodelshausenEmployeeCashRegisterCards(db: Database.Database) {
 }
 
 function ensureMay2026BodelshausenGuideShifts(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const sid = 'aral-bodelshausen'
   const ec = db.prepare(`SELECT COUNT(*) as c FROM employees WHERE station_id = ?`).get(sid) as { c: number }
   if ((ec?.c ?? 0) < 5) return
@@ -549,6 +558,7 @@ function ensureStationCanonicalNamesOnce(db: Database.Database) {
 
 /** Offizieller Anzeigename Aral Bodelshausen (ohne „Bulle 1000“); idempotent bei jedem Start. */
 function syncAralBodelshausenStationDisplayName(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const ts = nowIso()
   db.prepare(
     `UPDATE stations SET name = ?, brand = ?, updated_at = ? WHERE id = 'aral-bodelshausen'`,
@@ -588,6 +598,7 @@ function ensureStationRadioPresetsTable(db: Database.Database) {
 }
 
 function seedAralBodelshausenStationRadio(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const ts = nowIso()
   const d = STATION_RADIO_DEFAULTS_ARAL_BODELSHAUSEN
   db.prepare(
@@ -635,6 +646,7 @@ function ensureUserAuditLogTable(db: Database.Database) {
 
 /** Profil, E-Mail, Rechte Stationsleiter nur Aral Bodelshausen — Max Vins unangetastet. */
 function syncMathiasRaselowskiAccount(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const matId = 'user-mathias-raselowski'
   const row = db.prepare(`SELECT id FROM users WHERE id = ?`).get(matId) as { id: string } | undefined
   if (!row) return
@@ -664,6 +676,7 @@ function syncMathiasRaselowskiAccount(db: Database.Database) {
 
 /** Stammdaten-Anzeige-Rollen für Bodelshausen (bestehende DBs, Railway-Deploy). */
 function alignAralBodelshausenEmployeeDisplayRoles(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const stationId = 'aral-bodelshausen'
   const ts = nowIso()
   const stmt = db.prepare(
@@ -879,6 +892,13 @@ function ensureFuelPriceCacheAndStationTankerkoenig(db: Database.Database) {
      WHERE last_tankerkoenig_fetch_at IS NULL AND fetched_at IS NOT NULL AND trim(fetched_at) != ''`,
   ).run()
 
+  const stationCols = new Set(
+    (db.prepare(`PRAGMA table_info(stations)`).all() as { name: string }[]).map((r) => r.name),
+  )
+  if (!stationCols.has('tankerkoenig_station_id')) {
+    db.exec(`ALTER TABLE stations ADD COLUMN tankerkoenig_station_id TEXT`)
+  }
+
   const tsFk = nowIso()
   db.prepare(
     `UPDATE stations SET tankerkoenig_station_id = (
@@ -892,13 +912,6 @@ function ensureFuelPriceCacheAndStationTankerkoenig(db: Database.Database) {
          WHERE f2.station_id = stations.id AND trim(COALESCE(f2.provider_station_id, '')) != ''
        )`,
   ).run(tsFk)
-
-  const stationCols = new Set(
-    (db.prepare(`PRAGMA table_info(stations)`).all() as { name: string }[]).map((r) => r.name),
-  )
-  if (!stationCols.has('tankerkoenig_station_id')) {
-    db.exec(`ALTER TABLE stations ADD COLUMN tankerkoenig_station_id TEXT`)
-  }
 }
 
 function ensureTaskLogsTabletColumns(db: Database.Database) {
@@ -1132,6 +1145,7 @@ function migrateShiftBakingNoticesToBackshopAck(db: Database.Database) {
 }
 
 function ensureBackshopRoutineSeedForBodelshausen(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const tbl = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='backshop_routines'`).get() as
     | { name: string }
     | undefined
@@ -1186,6 +1200,7 @@ function ensureBackshopRoutineSeedForBodelshausen(db: Database.Database) {
 
 /** Einmalige Stammdaten-Übernahme Personalbögen → bestehende Profile Aral Bodelshausen (idempotent). */
 function ensurePersonalstammBodelshausenFromForms(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const c = db
     .prepare(
       `SELECT COUNT(*) as n FROM employees WHERE station_id = 'aral-bodelshausen' AND (deleted_at IS NULL OR trim(deleted_at) = '')`,
@@ -1948,7 +1963,30 @@ function ensureStationPayrollSurchargeRuleColumns(db: Database.Database) {
 }
 
 /** Aral Bodelshausen: Sonntagszuschläge aktiv, nur Sonntag/Feiertag (kein Nacht/Früh/Spät). */
+function ensureDemoStationSundayHolidaySurchargePolicy(db: Database.Database) {
+  const cols = new Set((db.prepare(`PRAGMA table_info(stations)`).all() as { name: string }[]).map((c) => c.name))
+  if (!cols.has('payroll_only_sunday_holiday_supplements')) {
+    db.exec(`ALTER TABLE stations ADD COLUMN payroll_only_sunday_holiday_supplements INTEGER`)
+  }
+  const exists = db.prepare(`SELECT 1 FROM stations WHERE id = ?`).get(DEMO_STATION_ID)
+  if (!exists) return
+  const ts = nowIso()
+  db.prepare(
+    `UPDATE stations SET
+      normal_weekday_night_bonus_enabled = 0,
+      normal_weekday_evening_bonus_enabled = 0,
+      saturday_surcharge_enabled = 0,
+      sunday_surcharge_enabled = 1,
+      payroll_supplements_prefer_schedule = 1,
+      default_special_holiday_percent = 150,
+      payroll_only_sunday_holiday_supplements = 1,
+      updated_at = ?
+    WHERE id = ?`,
+  ).run(ts, DEMO_STATION_ID)
+}
+
 function ensureBodelshausenSundayHolidaySurchargePolicy(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const cols = new Set((db.prepare(`PRAGMA table_info(stations)`).all() as { name: string }[]).map((c) => c.name))
   if (!cols.has('payroll_only_sunday_holiday_supplements')) {
     db.exec(`ALTER TABLE stations ADD COLUMN payroll_only_sunday_holiday_supplements INTEGER`)
@@ -2060,6 +2098,7 @@ function ensurePayrollQueryIndexes(db: Database.Database) {
 }
 
 function ensureStationBreakPolicyColumnsAndZeroBodelshausenBreaks(db: Database.Database) {
+  if (!shouldRunLegacyRealStationMigrations(db)) return
   const cols = new Set((db.prepare(`PRAGMA table_info(stations)`).all() as { name: string }[]).map((r) => r.name))
   if (!cols.has('automatic_break_deduction')) {
     db.exec(`ALTER TABLE stations ADD COLUMN automatic_break_deduction INTEGER NOT NULL DEFAULT 0`)

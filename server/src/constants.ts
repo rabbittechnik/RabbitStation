@@ -1,1 +1,3 @@
-export const DEFAULT_STATION_ID = 'aral-bodelshausen'
+import { DEMO_STATION_ID } from './constants/demo.js'
+
+export const DEFAULT_STATION_ID = DEMO_STATION_ID

@@ -158,7 +158,7 @@ export function ensureKnownStationsAndWorkAreas(db: Database, nowIsoStr: string)
 
   const tplDb = db
     .prepare(`SELECT id, name, short_code, color, description FROM work_areas WHERE station_id = ?`)
-    .all('aral-bodelshausen') as {
+    .all(KNOWN_STATIONS[0]!.id) as {
     id: string
     name: string
     short_code: string
@@ -177,7 +177,7 @@ export function ensureKnownStationsAndWorkAreas(db: Database, nowIsoStr: string)
     const c = db.prepare(`SELECT COUNT(*) as c FROM work_areas WHERE station_id = ?`).get(s.id) as { c: number }
     if ((c?.c ?? 0) > 0) continue
     for (const w of tpl) {
-      const wid = s.id === 'aral-bodelshausen' ? w.id : `${s.id}_${w.id}`
+      const wid = s.id === KNOWN_STATIONS[0]!.id ? w.id : `${s.id}_${w.id}`
       insWa.run(wid, s.id, w.name, w.short_code, w.color, w.description ?? '', nowIsoStr, nowIsoStr)
     }
   }
@@ -190,24 +190,26 @@ export function ensureDefaultUserStationAccess(db: Database, nowIsoStr: string) 
   )
   const exists = db.prepare(`SELECT 1 FROM user_station_access WHERE user_id = ? AND station_id = ?`)
 
-  const maxId = 'user-max-vins'
-  const matId = 'user-mathias-raselowski'
+  const adminId = 'user-demo-admin'
+  const leadId = 'user-demo-lead'
+  const demoStationId = KNOWN_STATIONS[0]!.id
 
-  /** Globaler Admin braucht keine user_station_access-Zeilen. */
-  db.prepare(`DELETE FROM user_station_access WHERE user_id = ?`).run(maxId)
+  const adminRow = db.prepare(`SELECT id FROM users WHERE id = ?`).get(adminId) as { id: string } | undefined
+  if (adminRow) {
+    db.prepare(`DELETE FROM user_station_access WHERE user_id = ?`).run(adminId)
+    db.prepare(`UPDATE users SET global_admin = 1, updated_at = ? WHERE id = ?`).run(nowIsoStr, adminId)
+  }
 
-  if (!exists.get(matId, 'aral-bodelshausen')) {
+  if (db.prepare(`SELECT id FROM users WHERE id = ?`).get(leadId) && !exists.get(leadId, demoStationId)) {
     ins.run(
       randomUUID(),
-      matId,
-      'aral-bodelshausen',
+      leadId,
+      demoStationId,
       'stationsleiter',
       JSON.stringify(mathiasStationsleiterPermissions()),
       nowIsoStr,
       nowIsoStr,
     )
+    db.prepare(`UPDATE users SET global_admin = 0, updated_at = ? WHERE id = ?`).run(nowIsoStr, leadId)
   }
-
-  db.prepare(`UPDATE users SET global_admin = 1, updated_at = ? WHERE id = ?`).run(nowIsoStr, maxId)
-  db.prepare(`UPDATE users SET global_admin = 0, updated_at = ? WHERE id = ?`).run(nowIsoStr, matId)
 }

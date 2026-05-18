@@ -1,31 +1,12 @@
-/** Feste Tankstellen-IDs (Mehrstations-Betrieb). */
+import { DEMO_STATION, DEMO_STATION_ID } from './demo.js'
+
+/** Bekannte Stationen für Bootstrap (nur neutrale Demo-Daten). */
 export const KNOWN_STATIONS = [
   {
-    id: 'aral-bodelshausen',
-    name: 'Aral Bodelshausen',
-    brand: 'ARAL',
-    city: 'Bodelshausen',
-    federalState: 'BW',
-  },
-  {
-    id: 'autohof-kehl',
-    name: 'Autohof Kehl',
-    brand: 'Autohof',
-    city: 'Kehl',
-    federalState: 'BW',
-  },
-  {
-    id: 'shell-ingersheim',
-    name: 'Shell Ingersheim',
-    brand: 'Shell',
-    city: 'Ingersheim',
-    federalState: 'BW',
-  },
-  {
-    id: 'shell-station-marsch',
-    name: 'Shell Station Marsch',
-    brand: 'Shell',
-    city: 'Marsch',
-    federalState: 'BW',
+    id: DEMO_STATION_ID,
+    name: DEMO_STATION.name,
+    brand: DEMO_STATION.brand,
+    city: DEMO_STATION.city,
+    federalState: DEMO_STATION.federalState,
   },
 ] as const

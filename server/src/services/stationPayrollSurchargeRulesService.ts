@@ -1,6 +1,7 @@
 import type { Database } from 'better-sqlite3'
+import { DEMO_STATION_ID } from '../constants/demo.js'
 import {
-  ARAL_BODELSHAUSEN_PAYROLL_SURCHARGE_RULES,
+  DEMO_STATION_PAYROLL_SURCHARGE_RULES,
   DEFAULT_STATION_PAYROLL_SURCHARGE_RULES,
   type StationPayrollSurchargeRules,
 } from '../types/stationPayrollSurchargeRules.js'
@@ -29,7 +30,10 @@ export function rulesFromStationRow(
   row: StationRulesRow | undefined | null,
   stationId: string,
 ): StationPayrollSurchargeRules {
-  const preset = stationId === 'aral-bodelshausen' ? ARAL_BODELSHAUSEN_PAYROLL_SURCHARGE_RULES : DEFAULT_STATION_PAYROLL_SURCHARGE_RULES
+  const preset =
+    stationId === DEMO_STATION_ID || stationId === 'aral-bodelshausen'
+      ? DEMO_STATION_PAYROLL_SURCHARGE_RULES
+      : DEFAULT_STATION_PAYROLL_SURCHARGE_RULES
   if (!row) return { ...preset }
 
   return {
