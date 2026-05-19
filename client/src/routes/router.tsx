@@ -11,6 +11,7 @@ import { DevicesPage } from '../pages/account/DevicesPage'
 import { UsersPage } from '../pages/account/UsersPage'
 import { AbsencesPage } from '../pages/absences/AbsencesPage'
 import { LoginPage } from '../pages/auth/LoginPage'
+import { SupportImpersonatePage } from '../pages/support/SupportImpersonatePage'
 import { CalendarPage } from '../pages/calendar/CalendarPage'
 import { AnnouncementsPage } from '../pages/communication/AnnouncementsPage'
 import { ChatGroupsPage } from '../pages/communication/ChatGroupsPage'
@@ -130,6 +131,10 @@ export const router = createBrowserRouter([
     path: '/login',
     element: <AuthLayout />,
     children: [{ index: true, element: <LoginPage /> }],
+  },
+  {
+    path: '/support/impersonate',
+    element: <SupportImpersonatePage />,
   },
   {
     path: '/app',

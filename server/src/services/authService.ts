@@ -33,6 +33,16 @@ export type JwtPayload = {
   tenantId?: string | null
   roleKey?: string | null
   platformRole?: string | null
+  isSupportMode?: boolean
+  supportSessionId?: string
+  supportAccessMode?: 'read_only' | 'support_write'
+}
+
+export type SupportJwtPayload = JwtPayload & {
+  isSupportMode: true
+  supportSessionId: string
+  supportAccessMode: 'read_only' | 'support_write'
+  tenantId: string
 }
 
 export function signAdminToken(payload: JwtPayload, rememberMe: boolean): string {
@@ -64,10 +74,37 @@ export function verifyAdminToken(token: string): JwtPayload | null {
       tenantId: decoded.tenantId != null ? String(decoded.tenantId) : null,
       roleKey: decoded.roleKey != null ? String(decoded.roleKey) : null,
       platformRole: decoded.platformRole != null ? String(decoded.platformRole) : null,
+      isSupportMode: decoded.isSupportMode === true,
+      supportSessionId:
+        decoded.supportSessionId != null ? String(decoded.supportSessionId) : undefined,
+      supportAccessMode:
+        decoded.supportAccessMode === 'support_write' ? 'support_write'
+        : decoded.supportAccessMode === 'read_only' ? 'read_only'
+        : undefined,
     }
   } catch {
     return null
   }
+}
+
+export function signSupportToken(payload: SupportJwtPayload, expiresAtIso: string): string {
+  const expSec = Math.floor(new Date(expiresAtIso).getTime() / 1000)
+  return jwt.sign(
+    {
+      sub: payload.sub,
+      username: payload.username,
+      displayName: payload.displayName,
+      roleId: payload.roleId,
+      tenantId: payload.tenantId,
+      roleKey: payload.roleKey ?? null,
+      platformRole: null,
+      isSupportMode: true,
+      supportSessionId: payload.supportSessionId,
+      supportAccessMode: payload.supportAccessMode,
+    },
+    JWT_SECRET,
+    { expiresIn: Math.max(60, expSec - Math.floor(Date.now() / 1000)) },
+  )
 }
 
 export function findUserByUsername(db: Database, username: string): AuthUserRow | undefined {

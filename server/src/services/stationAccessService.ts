@@ -241,3 +241,20 @@ export function ensureDefaultUserStationAccess(db: Database, nowIsoStr: string) 
     db.prepare(`UPDATE users SET global_admin = 0, updated_at = ? WHERE id = ?`).run(nowIsoStr, leadId)
   }
 }
+
+/** Support-Impersonation: Vollzugriff nur innerhalb des Ziel-Tenants. */
+export function buildSupportAccessContext(db: Database, userId: string, tenantId: string): AccessContext {
+  const all = db
+    .prepare(`SELECT id FROM stations WHERE tenant_id = ? AND ${VISIBLE_IN_DROPDOWN_SQL} ORDER BY name`)
+    .all(tenantId) as { id: string }[]
+  const stationIds = all.map((r) => r.id)
+  return {
+    userId,
+    globalAdmin: true,
+    tenantId,
+    isPlatformAdmin: false,
+    stationIds,
+    permissionsByStation: new Map(),
+    roleByStation: new Map(),
+  }
+}

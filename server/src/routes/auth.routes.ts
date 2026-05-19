@@ -9,6 +9,9 @@ import {
 } from '../services/authService.js'
 import { createPasswordResetToken, resetPasswordWithToken } from '../services/registrationService.js'
 import { appendUserAudit } from '../services/userAuditLogService.js'
+import { getTenantById, tenantToApi } from '../services/tenantService.js'
+import { getSubscriptionWriteState, getTrialMessage } from '../services/subscriptionService.js'
+import { buildTenantPlanEntitlements } from '../services/planFeatureService.js'
 
 export const authRouter = Router()
 
@@ -44,11 +47,37 @@ authRouter.get('/me', (req, res) => {
     jsonErr(res, 'Nicht angemeldet', 401)
     return
   }
-  const me = buildAuthMeUser(getDb(), req.adminUser.sub)
+  const db = getDb()
+  const me = buildAuthMeUser(db, req.adminUser.sub)
   const ms = Date.now() - t0
   if (ms >= 300) console.info(`[startup] GET /auth/me ${ms}ms`)
   if (!me) {
     jsonErr(res, 'Benutzer nicht gefunden', 404)
+    return
+  }
+  if (req.supportSession && req.adminUser.tenantId) {
+    const t = getTenantById(db, req.adminUser.tenantId)
+    const ws = t ? getSubscriptionWriteState(t) : null
+    jsonOk(res, {
+      ...me,
+      tenantId: req.adminUser.tenantId,
+      tenant: t ? tenantToApi(t) : me.tenant,
+      subscription: t && ws ? {
+        canWrite: req.supportSession.access_mode === 'support_write' ? ws.canWrite : false,
+        status: ws.status,
+        trialDaysLeft: ws.trialDaysLeft,
+        message: getTrialMessage(ws, t),
+      } : me.subscription,
+      planEntitlements: t ? buildTenantPlanEntitlements(db, t) : me.planEntitlements,
+      supportMode: {
+        sessionId: req.supportSession.id,
+        tenantId: req.supportSession.tenant_id,
+        tenantName: t?.company_name ?? req.supportSession.tenant_id,
+        reason: req.supportSession.reason,
+        accessMode: req.supportSession.access_mode,
+        expiresAt: req.supportSession.expires_at,
+      },
+    })
     return
   }
   jsonOk(res, me)

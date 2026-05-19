@@ -15,6 +15,6 @@
     "preview:client": "npm run preview -w client",
     "serve:client": "npm run start -w client",
     "start": "npm run start -w client",
-    "test": "tsx --test server/src/constants/plans.test.ts server/src/services/planFeatureService.test.ts client/src/data/pricingPlans.test.ts client/src/components/onboarding/tourPosition.test.ts"
+    "test": "tsx --test server/src/constants/plans.test.ts server/src/services/planFeatureService.test.ts server/src/routes/supportSession.api.test.ts client/src/data/pricingPlans.test.ts client/src/components/onboarding/tourPosition.test.ts"
   }
 }

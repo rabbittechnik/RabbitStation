@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { nowIso } from '../utils/timestamps.js'
 import { DEMO_STATION_ID } from '../constants/demo.js'
+import { ensureSupportSessionsTable } from './supportSessionMigrations.js'
 
 export const DEMO_TENANT_ID = 'tenant-demo-rabbitstation'
 
@@ -24,6 +25,7 @@ function addCol(db: Database.Database, table: string, col: string, ddl: string) 
 
 /** SaaS-Schema: Tenants, Abos, Audit, Tokens, Pairing. */
 export function runSaasMigrations(db: Database.Database) {
+  ensureSupportSessionsTable(db)
   db.exec(`
     CREATE TABLE IF NOT EXISTS tenants (
       id TEXT PRIMARY KEY,

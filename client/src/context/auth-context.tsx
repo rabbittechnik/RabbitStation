@@ -84,6 +84,14 @@ export type AuthUser = {
     usage: { stations: number; employees: number; tablets: number }
     subscriptionStatus: string
   }
+  supportMode?: {
+    sessionId: string
+    tenantId: string
+    tenantName: string
+    reason: string
+    accessMode: 'read_only' | 'support_write'
+    expiresAt: string
+  }
 }
 
 type AuthContextValue = {

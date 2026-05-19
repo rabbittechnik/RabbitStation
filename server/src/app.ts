@@ -32,6 +32,7 @@ import { publicRouter } from './routes/public.routes.js'
 import { tenantRouter } from './routes/tenant.routes.js'
 import { setupRouter } from './routes/setup.routes.js'
 import { platformAdminRouter } from './routes/platformAdmin.routes.js'
+import { supportPublicRouter } from './routes/support.routes.js'
 import { attachClientStatic } from './attachClientStatic.js'
 
 function parseCorsOrigins(): boolean | string[] {
@@ -70,6 +71,7 @@ export function createApp() {
 
   app.use('/api/public', publicRouter)
   app.use(adminApiGate)
+  app.use('/api/support', supportPublicRouter)
 
   app.use('/api/auth', authRouter)
   app.use('/api/tenant', tenantRouter)

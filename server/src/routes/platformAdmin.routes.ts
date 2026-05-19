@@ -7,6 +7,14 @@ import { nowIso } from '../utils/timestamps.js'
 import { appendTenantAudit } from '../services/tenantAuditService.js'
 import { buildAdminHealthPayload } from '../services/adminHealthService.js'
 import { normalizePlanId } from '../constants/plans.js'
+import {
+  startSupportSession,
+  listSupportSessions,
+  endSupportSession,
+  SupportSessionError,
+  countActiveSupportSessions,
+} from '../services/supportSessionService.js'
+import { getTenantById } from '../services/tenantService.js'
 
 export const platformAdminRouter = Router()
 platformAdminRouter.use(requirePlatformAdmin)
@@ -75,8 +83,83 @@ platformAdminRouter.get('/security/summary', (_req, res) => {
   jsonOk(res, {
     failedLogins24h: failed?.c ?? 0,
     blockedTenants: blocked?.c ?? 0,
-    activeSupportSessions: 0,
+    activeSupportSessions: countActiveSupportSessions(db),
   })
+})
+
+platformAdminRouter.get('/support-sessions', (req, res) => {
+  try {
+    const status = req.query.status ? String(req.query.status) : undefined
+    const tenantId = req.query.tenantId ? String(req.query.tenantId) : undefined
+    const sessions = listSupportSessions(getDb(), { status, tenantId })
+    jsonOk(res, { sessions })
+  } catch (e) {
+    if (e instanceof SupportSessionError) {
+      return res.status(e.status).json({ ok: false, error: e.message, code: e.code })
+    }
+    throw e
+  }
+})
+
+platformAdminRouter.post('/tenants/:tenantId/support-sessions/start', (req, res) => {
+  const tenantId = String(req.params.tenantId ?? '')
+  const body = req.body as {
+    reason?: string
+    accessMode?: string
+    durationMinutes?: number
+  }
+  try {
+    const db = getDb()
+    let adminEmail = 'control-center@system'
+    if (!req.controlCenterApiAuth && req.adminUser?.sub) {
+      const row = db.prepare(`SELECT email, username FROM users WHERE id = ?`).get(req.adminUser.sub) as
+        | { email: string | null; username: string | null }
+        | undefined
+      adminEmail = row?.email?.trim() || row?.username?.trim() || adminEmail
+    }
+    const result = startSupportSession(db, {
+      tenantId,
+      reason: String(body.reason ?? ''),
+      accessMode: body.accessMode === 'support_write' ? 'support_write' : 'read_only',
+      durationMinutes: Number(body.durationMinutes ?? 60),
+      adminUserId: req.adminUser?.sub ?? null,
+      adminEmail,
+      req,
+    })
+    const tenant = getTenantById(db, tenantId)
+    res.status(201).json({
+      ok: true,
+      supportSession: {
+        id: result.session.id,
+        tenantId: result.session.tenant_id,
+        tenantName: tenant?.company_name ?? tenantId,
+        accessMode: result.session.access_mode,
+        status: result.session.status,
+        expiresAt: result.session.expires_at,
+      },
+      impersonationUrl: result.impersonationUrl,
+    })
+  } catch (e) {
+    if (e instanceof SupportSessionError) {
+      return res.status(e.status).json({ ok: false, error: e.message, code: e.code })
+    }
+    throw e
+  }
+})
+
+platformAdminRouter.post('/support-sessions/:id/end', (req, res) => {
+  try {
+    endSupportSession(getDb(), String(req.params.id ?? ''), {
+      req,
+      userId: req.adminUser?.sub ?? null,
+    })
+    jsonOk(res, { ok: true })
+  } catch (e) {
+    if (e instanceof SupportSessionError) {
+      return res.status(e.status).json({ ok: false, error: e.message, code: e.code })
+    }
+    throw e
+  }
 })
 
 platformAdminRouter.get('/backups/status', (_req, res) => {

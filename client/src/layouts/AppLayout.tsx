@@ -6,6 +6,7 @@ import { Topbar } from '../components/topbar/Topbar'
 import { SetupIncompleteBanner } from '../components/onboarding/SetupIncompleteBanner'
 import { PlanStatusBanner } from '../components/saas/PlanStatusBanner'
 import { OnboardingTour } from '../components/onboarding/OnboardingTour'
+import { SupportModeBanner } from '../components/support/SupportModeBanner'
 import { useAuth } from '../context/auth-context'
 
 const BRAND_TITLE = 'Rabbit-Technik Station'
@@ -42,6 +43,7 @@ export function AppLayout() {
     <div className="flex min-h-dvh bg-[var(--bg-main)] text-[var(--text-main)]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col lg:pl-0">
+        <SupportModeBanner />
         <Topbar />
         <main className="flex-1 overflow-auto px-4 py-5 md:px-6 lg:px-8">
           <SetupIncompleteBanner />

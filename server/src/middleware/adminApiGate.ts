@@ -4,8 +4,11 @@ import { getDb } from '../db/database.js'
 import { buildAccessContext } from '../services/stationAccessService.js'
 import { trialWriteGate } from './trialWriteGate.js'
 import { planFeatureGate } from './planFeatureGate.js'
+import { supportWriteGate } from './supportWriteGate.js'
 import { isControlCenterApiRequest } from './controlCenterApiAuth.js'
 import { jsonErrAdmin } from '../utils/http.js'
+import { buildSupportAccessContext } from '../services/stationAccessService.js'
+import { getActiveSessionById } from '../services/supportSessionService.js'
 
 /**
  * Schützt alle /api/* Routen außer Health, Login, Public, Mitarbeiter-Zugang und Terminal.
@@ -21,6 +24,7 @@ export function adminApiGate(req: Request, res: Response, next: NextFunction) {
   if (p === '/api/tablet/pair' || p.startsWith('/api/tablet/session')) return next()
   if (p.startsWith('/api/tablet')) return next()
   if (p.startsWith('/api/fuel-prices')) return next()
+  if (p.startsWith('/api/support/impersonate')) return next()
 
   if (!p.startsWith('/api')) return next()
 
@@ -48,16 +52,41 @@ export function adminApiGate(req: Request, res: Response, next: NextFunction) {
     res.status(401).json({ ok: false, error: 'Sitzung abgelaufen' })
     return
   }
-  const row = getDb()
+  const db = getDb()
+  const row = db
     .prepare(`SELECT id FROM users WHERE id = ? AND (active IS NULL OR active = 1)`)
     .get(payload.sub) as { id: string } | undefined
   if (!row) {
     res.status(401).json({ ok: false, error: 'Benutzer ungültig' })
     return
   }
-  req.accessContext = buildAccessContext(getDb(), payload.sub)
+
+  if (payload.isSupportMode && payload.supportSessionId && payload.tenantId) {
+    const session = getActiveSessionById(db, payload.supportSessionId)
+    if (!session) {
+      res.status(401).json({
+        ok: false,
+        error: 'Support-Sitzung abgelaufen oder beendet.',
+        code: 'support_session_invalid',
+      })
+      return
+    }
+    req.supportSession = session
+    req.adminUser = payload
+    req.accessContext = buildSupportAccessContext(db, payload.sub, payload.tenantId)
+    planFeatureGate(req, res, () => {
+      trialWriteGate(req, res, () => {
+        supportWriteGate(req, res, next)
+      })
+    })
+    return
+  }
+
+  req.accessContext = buildAccessContext(db, payload.sub)
   req.adminUser = payload
   planFeatureGate(req, res, () => {
-    trialWriteGate(req, res, next)
+    trialWriteGate(req, res, () => {
+      supportWriteGate(req, res, next)
+    })
   })
 }
