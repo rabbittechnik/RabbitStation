@@ -1,16 +1,23 @@
 import type { Request, Response, NextFunction } from 'express'
 import { getDb } from '../db/database.js'
 import { getUserTenantContext } from '../services/tenantService.js'
-import { jsonErr } from '../utils/http.js'
+import { jsonErrAdmin } from '../utils/http.js'
 
 export function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
+  if (req.controlCenterApiAuth) {
+    if (req.method !== 'GET') {
+      jsonErrAdmin(res, 'forbidden', 'Forbidden', 403)
+      return
+    }
+    return next()
+  }
   if (!req.adminUser) {
-    jsonErr(res, 'Nicht angemeldet', 401)
+    jsonErrAdmin(res, 'unauthorized', 'Unauthorized', 401)
     return
   }
   const ctx = getUserTenantContext(getDb(), req.adminUser.sub)
   if (!ctx?.isPlatformAdmin) {
-    jsonErr(res, 'Keine Berechtigung', 403)
+    jsonErrAdmin(res, 'forbidden', 'Forbidden', 403)
     return
   }
   next()

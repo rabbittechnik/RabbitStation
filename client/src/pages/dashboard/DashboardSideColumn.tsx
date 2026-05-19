@@ -13,6 +13,7 @@ import type { ScheduleShift } from '../../data/mockSchedule'
 import { toISODate } from '../../data/mockSchedule'
 import { addDays, startOfWeekMonday } from '../../components/schedule/scheduleWeekUtils'
 import { calculateOpenShiftsForWeek } from '../../data/defaultShiftRequirements'
+import { useShiftRequirementOptions } from '../../hooks/useShiftRequirementOptions'
 
 function formatDeRange(start: string, end: string): string {
   const f = (iso: string) => {
@@ -72,6 +73,8 @@ export function PendingAbsencesCard() {
 
 export function UnfilledShiftsCard() {
   const { stationId, federalState, standardWorkTimesJson } = useStation()
+  const shiftOpts = useShiftRequirementOptions()
+  const setupIncomplete = !shiftOpts.setupCompleted || !shiftOpts.shiftSetupCompleted
   const [open, setOpen] = useState<ScheduleShift[]>([])
   const [weekShifts, setWeekShifts] = useState<ScheduleShift[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,8 +130,9 @@ export function UnfilledShiftsCard() {
         stationId ?? '',
         federalState,
         standardWorkTimesJson,
+        shiftOpts,
       ),
-    [weekBounds.weekStart, weekShifts, open, stationId, federalState, standardWorkTimesJson],
+    [weekBounds.weekStart, weekShifts, open, stationId, federalState, standardWorkTimesJson, shiftOpts],
   )
 
   const hasMissing = weekSummary.missingRequiredFlat.length > 0
@@ -142,8 +146,15 @@ export function UnfilledShiftsCard() {
       </h3>
       {error ? (
         <p className="mt-3 text-sm text-rose-300">{error}</p>
-      ) : loading ? (
+      ) : loading || shiftOpts.loading ? (
         <p className="mt-3 text-sm text-[var(--text-muted)]">Lade offene Schichten…</p>
+      ) : setupIncomplete ? (
+        <p className="mt-3 text-sm text-amber-100/90">
+          Bitte richten Sie zuerst Ihre Schichtmodelle ein.{' '}
+          <Link to="/setup" className="font-medium text-cyan-300 underline-offset-2 hover:underline">
+            Zum Setup
+          </Link>
+        </p>
       ) : showEmpty ? (
         <p className="mt-3 text-sm text-[var(--text-faint)]">Keine offenen Schichten in dieser Woche.</p>
       ) : (

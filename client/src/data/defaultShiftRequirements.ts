@@ -12,7 +12,21 @@ import { dayIndexInWeek, toISODate } from './mockSchedule'
 /** Stationen mit Feiertags-Sonderlogik (Früh: 07:30 oder 08:30), falls keine Feiertagszeiten in den Stammdaten. */
 export const DEFAULT_SHIFT_REQUIREMENTS_STATION_IDS = ['aral-bodelshausen'] as const
 
-export type RequiredShiftType = 'early' | 'late'
+export type RequiredShiftType = 'early' | 'late' | 'middle' | 'night' | 'office' | 'custom'
+
+export type ShiftTemplateRef = {
+  id: string
+  name: string
+  type: string
+  startTime: string
+  endTime: string
+}
+
+export type ShiftRequirementOptions = {
+  setupCompleted?: boolean
+  shiftSetupCompleted?: boolean
+  shiftTemplates?: ShiftTemplateRef[]
+}
 
 export type TimeRange = { startTime: string; endTime: string }
 
@@ -217,6 +231,23 @@ function slotsFromEarlyLateJson(
   ]
 }
 
+function slotsFromShiftTemplates(templates: ShiftTemplateRef[]): DefaultRequirementSlot[] {
+  return templates.map((t, i) => {
+    const st = normSlotTime(t.startTime)
+    const en = normSlotTime(t.endTime)
+    const type = (['early', 'late', 'middle', 'night', 'office', 'custom'].includes(t.type) ?
+      t.type
+    : 'custom') as RequiredShiftType
+    return {
+      id: `tpl-${t.id || i}`,
+      shiftType: type,
+      label: t.name,
+      displayRange: { startTime: st, endTime: en },
+      acceptedRanges: [{ startTime: st, endTime: en }],
+    }
+  })
+}
+
 /**
  * Soll-Schichten für ein Kalenderdatum (Früh/Spät).
  * Optional: `standardWorkTimesJson` aus der Station (`standard_work_times_json`).
@@ -226,7 +257,15 @@ export function getDefaultShiftRequirementsForDate(
   stationId: string,
   federalState: GermanState,
   standardWorkTimesJson?: string | null,
+  options?: ShiftRequirementOptions,
 ): DefaultRequirementSlot[] {
+  if (options) {
+    if (!options.setupCompleted || !options.shiftSetupCompleted) return []
+    if (options.shiftTemplates && options.shiftTemplates.length > 0) {
+      return slotsFromShiftTemplates(options.shiftTemplates)
+    }
+  }
+
   const wt = parseStationStandardWorkTimes(standardWorkTimesJson)
   const fromStation = wt.early && wt.late ? slotsFromEarlyLateJson(wt.early, wt.late, 'station') : null
 
@@ -256,6 +295,7 @@ export function getDefaultShiftRequirementsForDate(
 
   if (fromStation) return fromStation
 
+  if (!stationUsesDefaultShiftRequirements(stationId)) return []
   return slotsForCalendarWeekday(date)
 }
 
@@ -390,12 +430,13 @@ export function isOpenDbShiftRedundantWithCoverage(
   return calculateCoverageGaps(open.startTime, open.endTime, assigned, tolMinutes).length === 0
 }
 
-function formatMissingSummary(early: number, late: number): string {
-  if (early === 0 && late === 0) return ''
-  const parts: string[] = []
-  if (early > 0) parts.push(`${early} Früh`)
-  if (late > 0) parts.push(`${late} Spät`)
-  return `${parts.join(' / ')} fehlen`
+function formatMissingSummary(missing: MissingRequiredShift[]): string {
+  if (missing.length === 0) return ''
+  const counts = new Map<string, number>()
+  for (const m of missing) {
+    counts.set(m.label, (counts.get(m.label) ?? 0) + 1)
+  }
+  return [...counts.entries()].map(([label, n]) => `${n}× ${label}`).join(' · ') + ' fehlen'
 }
 
 export function calculateOpenShiftsForWeek(
@@ -405,6 +446,7 @@ export function calculateOpenShiftsForWeek(
   stationId: string,
   federalState: GermanState,
   standardWorkTimesJson?: string | null,
+  options?: ShiftRequirementOptions,
 ): OpenShiftWeekSummary {
   const weekEnd = addDaysIso(weekStart, 6)
   const inWeek = (s: ScheduleShift) => s.date >= weekStart && s.date <= weekEnd
@@ -423,7 +465,7 @@ export function calculateOpenShiftsForWeek(
   const missingFlat: MissingRequiredShift[] = []
   for (let i = 0; i < 7; i++) {
     const date = addDaysIso(weekStart, i)
-    const req = getDefaultShiftRequirementsForDate(date, stationId, federalState, standardWorkTimesJson)
+    const req = getDefaultShiftRequirementsForDate(date, stationId, federalState, standardWorkTimesJson, options)
     missingFlat.push(...detectMissingRequiredShifts(date, weekShifts, req))
   }
 
@@ -453,19 +495,29 @@ export function calculateOpenShiftsForWeek(
     openDbShifts: openDb,
     totalOpenDb,
     totalCount: totalNum,
-    summaryLine: formatMissingSummary(earlyMissing, lateMissing),
+    summaryLine: formatMissingSummary(missingFlat),
   }
 }
 
 /**
  * Synthetische Timeline-Blöcke für fehlende Soll-Besetzung (keine DB-Zeile).
  */
+function requirementTypeToBlockType(shiftType: string): import('./mockSchedule').ShiftTypeId {
+  if (shiftType === 'early') return 'frueh'
+  if (shiftType === 'late') return 'spaet'
+  if (shiftType === 'night') return 'nacht'
+  if (shiftType === 'middle') return 'mittel'
+  if (shiftType === 'office') return 'regular'
+  return 'sonderdienst'
+}
+
 export function buildRequirementGapResolvedBlocks(
   weekMonday: Date,
   stationId: string,
   federalState: GermanState,
   weekShifts: ScheduleShift[],
   standardWorkTimesJson?: string | null,
+  options?: ShiftRequirementOptions,
 ): ResolvedShiftBlock[] {
   const weekStart = toISODate(weekMonday)
   const summary = calculateOpenShiftsForWeek(
@@ -475,6 +527,7 @@ export function buildRequirementGapResolvedBlocks(
     stationId,
     federalState,
     standardWorkTimesJson,
+    options,
   )
   const out: ResolvedShiftBlock[] = []
   for (let idx = 0; idx < summary.missingRequiredFlat.length; idx++) {
@@ -484,7 +537,7 @@ export function buildRequirementGapResolvedBlocks(
     out.push({
       id: `synthetic-req-${m.date}-${m.shiftType}-${idx}`,
       dayIndex: di,
-      type: m.shiftType === 'early' ? 'frueh' : 'spaet',
+      type: requirementTypeToBlockType(m.shiftType),
       start: m.startTime,
       end: m.endTime,
       workAreaCode: 'K',
@@ -497,9 +550,17 @@ export function buildRequirementGapResolvedBlocks(
   return out
 }
 
+function toAssistantSlotKind(shiftType: RequiredShiftType): import('../types/scheduleAssistant').AssistantSlotKind {
+  if (shiftType === 'office' || shiftType === 'custom') return 'middle'
+  if (shiftType === 'early' || shiftType === 'late' || shiftType === 'night' || shiftType === 'middle') {
+    return shiftType
+  }
+  return 'middle'
+}
+
 function toDayRequirementSlot(s: DefaultRequirementSlot): DayRequirementSlot {
   return {
-    kind: s.shiftType,
+    kind: toAssistantSlotKind(s.shiftType),
     startTime: s.displayRange.startTime,
     endTime: s.displayRange.endTime,
     workAreaId: 'kasse',
@@ -513,10 +574,11 @@ export function buildDefaultWeekRequirements(
   stationId: string,
   federalState: GermanState,
   standardWorkTimesJson?: string | null,
+  options?: ShiftRequirementOptions,
 ): DayRequirement[] {
   return [0, 1, 2, 3, 4, 5, 6].map((i) => {
     const date = addDaysIso(weekStart, i)
-    const req = getDefaultShiftRequirementsForDate(date, stationId, federalState, standardWorkTimesJson)
+    const req = getDefaultShiftRequirementsForDate(date, stationId, federalState, standardWorkTimesJson, options)
     return {
       date,
       slots: req.map(toDayRequirementSlot),

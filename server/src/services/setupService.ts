@@ -1,19 +1,61 @@
 import type { Database } from 'better-sqlite3'
+import { randomUUID } from 'node:crypto'
 import { nowIso } from '../utils/timestamps.js'
 import { getUserTenantContext, getTenantById } from './tenantService.js'
 import { assertTenantCanWrite } from './subscriptionService.js'
+import { type ShiftTemplateInput, listShiftTemplates, replaceShiftTemplates } from './shiftTemplateService.js'
+import { createEmployee } from './employeeService.js'
+
+export type SetupWizardStep = 'welcome' | 'shifts' | 'tuv' | 'employee' | 'owner' | 'finish'
 
 export type SetupState = {
   setupCompleted: boolean
+  onboardingTourCompleted: boolean
+  shiftSetupCompleted: boolean
+  monthlyTuvReportEnabled: boolean | null
+  ownerAsEmployeeEnabled: boolean
+  setupOwnerAnswered: boolean
+  selectedShiftTypes: string[]
+  stationId: string | null
+  wizardStep: SetupWizardStep
+  canComplete: boolean
+  employeeCount: number
   steps: {
-    station: boolean
-    shiftModel: boolean
-    surcharges: boolean
-    employees: boolean
-    tablet: boolean
+    shifts: boolean
+    tuv: boolean
+    owner: boolean
     complete: boolean
   }
-  stationId: string | null
+}
+
+type StationOnboardingRow = {
+  id: string
+  shift_setup_completed: number
+  monthly_tuv_report_enabled: number | null
+  owner_as_employee_enabled: number
+  setup_owner_answered: number
+}
+
+function primaryStation(db: Database, tenantId: string): StationOnboardingRow | undefined {
+  return db
+    .prepare(
+      `SELECT id, shift_setup_completed, monthly_tuv_report_enabled,
+              owner_as_employee_enabled, setup_owner_answered
+       FROM stations WHERE tenant_id = ? ORDER BY created_at LIMIT 1`,
+    )
+    .get(tenantId) as StationOnboardingRow | undefined
+}
+
+function resolveWizardStep(
+  setupCompleted: boolean,
+  st: StationOnboardingRow | undefined,
+): SetupWizardStep {
+  if (setupCompleted) return 'finish'
+  if (!st) return 'welcome'
+  if (st.shift_setup_completed !== 1) return 'shifts'
+  if (st.monthly_tuv_report_enabled == null) return 'tuv'
+  if (st.setup_owner_answered !== 1) return 'owner'
+  return 'finish'
 }
 
 export function getSetupState(db: Database, userId: string): SetupState {
@@ -21,82 +63,174 @@ export function getSetupState(db: Database, userId: string): SetupState {
   if (!ctx?.tenantId) {
     return {
       setupCompleted: true,
-      steps: {
-        station: true,
-        shiftModel: true,
-        surcharges: true,
-        employees: true,
-        tablet: true,
-        complete: true,
-      },
+      onboardingTourCompleted: true,
+      shiftSetupCompleted: true,
+      monthlyTuvReportEnabled: null,
+      ownerAsEmployeeEnabled: false,
+      setupOwnerAnswered: true,
+      selectedShiftTypes: [],
       stationId: null,
+      wizardStep: 'finish',
+      canComplete: true,
+      employeeCount: 0,
+      steps: { shifts: true, tuv: true, owner: true, complete: true },
     }
   }
   const tenant = getTenantById(db, ctx.tenantId)
-  const station = db
-    .prepare(`SELECT id, name FROM stations WHERE tenant_id = ? ORDER BY created_at LIMIT 1`)
-    .get(ctx.tenantId) as { id: string; name: string } | undefined
-  const stationId = station?.id ?? null
-  const stationRow = stationId ?
-    (db.prepare(`SELECT standard_work_times_json FROM stations WHERE id = ?`).get(stationId) as
-      | { standard_work_times_json: string | null }
-      | undefined)
-  : undefined
-  const shiftConfigured = Boolean(stationRow?.standard_work_times_json?.trim())
+  const st = primaryStation(db, ctx.tenantId)
+  const stationId = st?.id ?? null
+  const templates = stationId ? listShiftTemplates(db, stationId, ctx.tenantId) : []
   const empCount =
     stationId ?
       (db.prepare(`SELECT COUNT(*) as c FROM employees WHERE station_id = ? AND deleted_at IS NULL`).get(stationId) as {
         c: number
       }).c
     : 0
-  const tabletCount =
-    stationId ?
-      (
-        db
-          .prepare(`SELECT COUNT(*) as c FROM station_tablet_devices WHERE station_id = ?`)
-          .get(stationId) as { c: number }
-      ).c
-    : 0
-  const holidayCount =
-    stationId ?
-      (db.prepare(`SELECT COUNT(*) as c FROM station_extra_holidays WHERE station_id = ?`).get(stationId) as {
-        c: number
-      }).c
-    : 0
 
-  const steps = {
-    station: Boolean(station?.name?.trim()),
-    shiftModel: shiftConfigured,
-    surcharges: holidayCount > 0 || shiftConfigured,
-    employees: empCount > 0,
-    tablet: tabletCount > 0,
-    complete: tenant?.setup_completed === 1,
-  }
+  const setupCompleted = tenant?.setup_completed === 1
+  const onboardingTourCompleted = (tenant as { onboarding_tour_completed?: number } | undefined)?.onboarding_tour_completed === 1
+  const shiftSetupCompleted = st?.shift_setup_completed === 1
+  const tuvAnswered = st != null && st.monthly_tuv_report_enabled != null
+  const ownerAnswered = st?.setup_owner_answered === 1
+  const canComplete = Boolean(shiftSetupCompleted && tuvAnswered && ownerAnswered)
+
   return {
-    setupCompleted: tenant?.setup_completed === 1,
-    steps,
+    setupCompleted,
+    onboardingTourCompleted,
+    shiftSetupCompleted,
+    monthlyTuvReportEnabled:
+      st?.monthly_tuv_report_enabled == null ? null : st.monthly_tuv_report_enabled === 1,
+    ownerAsEmployeeEnabled: st?.owner_as_employee_enabled === 1,
+    setupOwnerAnswered: ownerAnswered,
+    selectedShiftTypes: templates.map((t) => t.type),
     stationId,
+    wizardStep: resolveWizardStep(setupCompleted, st),
+    canComplete,
+    employeeCount: empCount,
+    steps: {
+      shifts: shiftSetupCompleted,
+      tuv: tuvAnswered,
+      owner: ownerAnswered,
+      complete: setupCompleted,
+    },
   }
 }
 
-export function applySetupShiftPresets(db: Database, userId: string, stationId: string) {
+export function saveSetupShiftTemplates(
+  db: Database,
+  userId: string,
+  stationId: string,
+  templates: ShiftTemplateInput[],
+) {
+  const ctx = getUserTenantContext(db, userId)
+  if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  assertTenantCanWrite(db, ctx.tenantId)
+  return replaceShiftTemplates(db, ctx.tenantId, stationId, templates)
+}
+
+export function saveTuvPreference(db: Database, userId: string, stationId: string, enabled: boolean) {
   const ctx = getUserTenantContext(db, userId)
   if (!ctx?.tenantId) throw new Error('Kein Tenant')
   assertTenantCanWrite(db, ctx.tenantId)
   const ts = nowIso()
-  const presets = [
-    { id: 'frueh', label: 'Frühschicht', start: '06:00', end: '14:00' },
-    { id: 'spaet', label: 'Spätschicht', start: '14:00', end: '22:00' },
-    { id: 'nacht', label: 'Nachtschicht', start: '22:00', end: '06:00' },
-  ]
+  const n = db
+    .prepare(
+      `UPDATE stations SET monthly_tuv_report_enabled = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    )
+    .run(enabled ? 1 : 0, ts, stationId, ctx.tenantId).changes
+  if (n === 0) throw new Error('Station nicht gefunden')
+}
+
+export function saveOwnerAsEmployee(db: Database, userId: string, stationId: string, enabled: boolean) {
+  const ctx = getUserTenantContext(db, userId)
+  if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  assertTenantCanWrite(db, ctx.tenantId)
+  const ts = nowIso()
+  const user = db
+    .prepare(`SELECT id, display_name, email, phone, employee_id FROM users WHERE id = ?`)
+    .get(userId) as
+    | { id: string; display_name: string | null; email: string | null; phone: string | null; employee_id: string | null }
+    | undefined
+  if (!user) throw new Error('Benutzer nicht gefunden')
+
   db.prepare(
-    `UPDATE stations SET standard_work_times_json = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
-  ).run(JSON.stringify({ presets }), ts, stationId, ctx.tenantId)
+    `UPDATE stations SET owner_as_employee_enabled = ?, setup_owner_answered = 1, updated_at = ?
+     WHERE id = ? AND tenant_id = ?`,
+  ).run(enabled ? 1 : 0, ts, stationId, ctx.tenantId)
+
+  if (enabled) {
+    if (!user.employee_id?.trim()) {
+      const parts = String(user.display_name ?? 'Betreiber').trim().split(/\s+/)
+      const first = parts[0] ?? 'Betreiber'
+      const last = parts.slice(1).join(' ') || 'Inhaber'
+      const empId = randomUUID()
+      createEmployee(
+        db,
+        {
+          id: empId,
+          firstName: first,
+          lastName: last,
+          displayName: user.display_name ?? `${first} ${last}`,
+          email: user.email,
+          phone: user.phone,
+          employmentRole: 'Chef / Betreiber',
+          role: 'Chef / Betreiber',
+          employmentType: 'vollzeit',
+          workAreaIds: ['kasse'],
+        },
+        stationId,
+      )
+      db.prepare(`UPDATE users SET employee_id = ?, updated_at = ? WHERE id = ?`).run(empId, ts, userId)
+    }
+  }
+}
+
+export function createSetupFirstEmployee(
+  db: Database,
+  userId: string,
+  stationId: string,
+  body: Record<string, unknown>,
+) {
+  const ctx = getUserTenantContext(db, userId)
+  if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  assertTenantCanWrite(db, ctx.tenantId)
+  return createEmployee(db, body, stationId)
 }
 
 export function completeSetup(db: Database, userId: string) {
   const ctx = getUserTenantContext(db, userId)
   if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  assertTenantCanWrite(db, ctx.tenantId)
+  const state = getSetupState(db, userId)
+  if (!state.canComplete) {
+    throw new Error('Pflichtschritte noch nicht abgeschlossen (Schichten, TÜV-Entscheidung, Inhaber-Frage)')
+  }
   const ts = nowIso()
   db.prepare(`UPDATE tenants SET setup_completed = 1, updated_at = ? WHERE id = ?`).run(ts, ctx.tenantId)
+}
+
+export function completeOnboardingTour(db: Database, userId: string) {
+  const ctx = getUserTenantContext(db, userId)
+  if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  const ts = nowIso()
+  db.prepare(`UPDATE tenants SET onboarding_tour_completed = 1, updated_at = ? WHERE id = ?`).run(ts, ctx.tenantId)
+}
+
+export function resetOnboardingTour(db: Database, userId: string) {
+  const ctx = getUserTenantContext(db, userId)
+  if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  const ts = nowIso()
+  db.prepare(`UPDATE tenants SET onboarding_tour_completed = 0, updated_at = ? WHERE id = ?`).run(ts, ctx.tenantId)
+}
+
+/** @deprecated Delegiert auf shift_templates */
+export function applySetupShiftPresets(db: Database, userId: string, stationId: string) {
+  const ctx = getUserTenantContext(db, userId)
+  if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  assertTenantCanWrite(db, ctx.tenantId)
+  return replaceShiftTemplates(db, ctx.tenantId, stationId, [
+    { type: 'early', startTime: '06:00', endTime: '14:00' },
+    { type: 'late', startTime: '14:00', endTime: '22:00' },
+    { type: 'night', startTime: '22:00', endTime: '06:00' },
+  ])
 }

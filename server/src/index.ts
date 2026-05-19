@@ -6,6 +6,9 @@ initDatabase()
 
 const app = createApp()
 const PORT = Number(process.env.PORT) || 3001
+if (!process.env.PORT) {
+  console.warn('[server] PORT nicht gesetzt — Fallback', PORT)
+}
 const HOST = process.env.HOST || '0.0.0.0'
 
 const server = app.listen(PORT, HOST, () => {

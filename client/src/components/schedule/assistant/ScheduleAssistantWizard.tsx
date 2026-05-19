@@ -3,6 +3,7 @@ import type { AssistantMode, AssistantSuggestedShift, DayRequirement } from '../
 import { useStation } from '../../../context/station-context'
 import { scheduleAssistantApply, scheduleAssistantGenerate } from '../../../services/api'
 import { buildDefaultWeekRequirements } from '../../../utils/scheduleAssistantWeek'
+import { useShiftRequirementOptions } from '../../../hooks/useShiftRequirementOptions'
 import { Button } from '../../ui/Button'
 import { AssistantRequirementStep } from './AssistantRequirementStep'
 import { AssistantRulesStep } from './AssistantRulesStep'
@@ -20,11 +21,12 @@ type Props = {
 
 export function ScheduleAssistantWizard({ open, initialWeekStartIso, onClose, onApplied }: Props) {
   const { stationId, federalState, standardWorkTimesJson } = useStation()
+  const shiftOpts = useShiftRequirementOptions()
   const [step, setStep] = useState(0)
   const [weekStartIso, setWeekStartIso] = useState(initialWeekStartIso)
   const [mode, setMode] = useState<AssistantMode>('fill_gaps')
   const [requirements, setRequirements] = useState<DayRequirement[]>(() =>
-    buildDefaultWeekRequirements(initialWeekStartIso, stationId ?? '', federalState, standardWorkTimesJson),
+    buildDefaultWeekRequirements(initialWeekStartIso, stationId ?? '', federalState, standardWorkTimesJson, shiftOpts),
   )
   const [suggested, setSuggested] = useState<AssistantSuggestedShift[]>([])
   const [warnings, setWarnings] = useState<string[]>([])
@@ -40,13 +42,15 @@ export function ScheduleAssistantWizard({ open, initialWeekStartIso, onClose, on
     setWarnings([])
     setErr(null)
     setRequirements(
-      buildDefaultWeekRequirements(initialWeekStartIso, stationId ?? '', federalState, standardWorkTimesJson),
+      buildDefaultWeekRequirements(initialWeekStartIso, stationId ?? '', federalState, standardWorkTimesJson, shiftOpts),
     )
-  }, [open, initialWeekStartIso, stationId, federalState, standardWorkTimesJson])
+  }, [open, initialWeekStartIso, stationId, federalState, standardWorkTimesJson, shiftOpts])
 
   useEffect(() => {
-    setRequirements(buildDefaultWeekRequirements(weekStartIso, stationId ?? '', federalState, standardWorkTimesJson))
-  }, [weekStartIso, stationId, federalState, standardWorkTimesJson])
+    setRequirements(
+      buildDefaultWeekRequirements(weekStartIso, stationId ?? '', federalState, standardWorkTimesJson, shiftOpts),
+    )
+  }, [weekStartIso, stationId, federalState, standardWorkTimesJson, shiftOpts])
 
   const runGenerate = useCallback(async () => {
     if (!stationId) return false

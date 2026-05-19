@@ -1,13 +1,11 @@
-/** Zentraler REST-Client (Phase 8/9). Base-URL aus VITE_API_URL, Fallback Port 3001. */
+/** Zentraler REST-Client (Phase 8/9). Production: /api (gleicher Host); Dev: VITE_API_URL oder 127.0.0.1:3001. */
 
 import type { ScheduleAssistantApplyResult, ScheduleAssistantGenerateResult } from '../types/scheduleAssistant'
 import { getEmployeeAppDeviceHeaders } from '../pages/employee-app/employeeAppStorage'
 import { DEFAULT_FETCH_TIMEOUT_MS, fetchWithTimeout, isAbortError } from '../lib/fetchWithTimeout'
+import { API_BASE } from '../lib/apiBase'
 
-export { DEFAULT_FETCH_TIMEOUT_MS }
-
-const rawBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
-export const API_BASE = rawBase || 'http://localhost:3001/api'
+export { DEFAULT_FETCH_TIMEOUT_MS, API_BASE }
 
 const TOKEN_LOCAL = 'rabbit_technik_admin_token'
 const TOKEN_LOCAL_LEGACY = 'neonshift_admin_token'

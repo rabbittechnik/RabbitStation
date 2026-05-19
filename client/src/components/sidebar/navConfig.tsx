@@ -18,6 +18,7 @@ export type NavLeaf = {
   globalAdminOnly?: boolean
   /** Sichtbar, wenn mindestens eine dieser Berechtigungen gesetzt ist (Station-Kontext). */
   anyPermission?: string[]
+  dataTour?: string
 }
 
 export type NavGroup = {
@@ -58,13 +59,13 @@ export const navEntries: NavEntry[] = [
     label: 'Organisation',
     icon: LayoutGrid,
     children: [
-      { to: '/schedule', label: 'Schichtplan' },
+      { to: '/schedule', label: 'Schichtplan', dataTour: 'schedule' },
       { to: '/absences', label: 'Abwesenheiten' },
-      { to: '/tasks', label: 'Aufgaben' },
+      { to: '/tasks', label: 'Aufgaben', dataTour: 'tasks' },
       { to: '/lists', label: 'Listen' },
-      { to: '/documents', label: 'Dokumente', anyPermission: ['documents.view'] },
+      { to: '/documents', label: 'Dokumente', anyPermission: ['documents.view'], dataTour: 'documents' },
       { to: '/calendar', label: 'Terminkalender' },
-      { to: '/contacts', label: 'Kontakte' },
+      { to: '/contacts', label: 'Kontakte', dataTour: 'contacts' },
       {
         to: '/organisation/representatives',
         label: 'Telefonnummern / Vertreter',
@@ -100,6 +101,7 @@ export const navEntries: NavEntry[] = [
         to: '/reports/payroll-time',
         label: 'Lohnabrechnung (Zeiterfassung)',
         anyPermission: ['payroll.view', 'reports.payroll'],
+        dataTour: 'payroll',
       },
       { to: '/zeiterfassung/freigaben', label: 'Zeitfreigaben', approverOnly: true },
       {
@@ -148,7 +150,7 @@ export const navEntries: NavEntry[] = [
     icon: UserCircle,
     children: [
       { to: '/account', label: 'Profil' },
-      { to: '/account/devices', label: 'Geräte & Apps' },
+      { to: '/account/devices', label: 'Geräte & Apps', dataTour: 'tablet' },
       { to: '/account/users', label: 'Benutzer verwalten', globalAdminOnly: true },
       { to: '/account/billing', label: 'Rechnungen' },
       { to: '/account/billing-documents', label: 'Abrechnungsunterlagen' },

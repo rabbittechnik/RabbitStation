@@ -17,6 +17,8 @@ import {
   hasPermission,
 } from '../services/stationAccessService.js'
 import type { AccessContext } from '../services/stationAccessService.js'
+import { getUserTenantContext } from '../services/tenantService.js'
+import { listShiftTemplates } from '../services/shiftTemplateService.js'
 
 export const stationsRouter = Router()
 
@@ -86,6 +88,21 @@ function shiftCloseChecklistDefRowToApi(r: StationShiftChecklistDefRow) {
     updatedAt: r.updated_at,
   }
 }
+
+stationsRouter.get('/:id/shift-templates', (req, res) => {
+  try {
+    const ctx = req.accessContext
+    if (!ctx || !req.adminUser) return jsonErr(res, 'Keine Berechtigung', 403)
+    const id = req.params.id
+    if (!canReadStation(ctx, id)) return jsonErr(res, 'Kein Zugriff auf diese Station', 403)
+    const tenantCtx = getUserTenantContext(getDb(), req.adminUser.sub)
+    if (!tenantCtx?.tenantId) return jsonErr(res, 'Kein Tenant', 403)
+    const templates = listShiftTemplates(getDb(), id, tenantCtx.tenantId)
+    jsonOk(res, { templates })
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Fehler', 500)
+  }
+})
 
 stationsRouter.get('/:id/shift-close-checklist-defs', (req, res) => {
   try {

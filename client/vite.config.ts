@@ -39,10 +39,14 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port,
-    // Ohne gesetztes PORT (lokal): anderen Port probieren; mit PORT (Replit): strikt
     strictPort: Boolean(rawPort),
-    // Replit / andere Proxies mit wechselndem Host-Header
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: '0.0.0.0',

@@ -6,4 +6,5 @@ buildCommand = "npm run build"
 [deploy]
 startCommand = "npm run start -w server"
 healthcheckPath = "/api/health"
+# Build baut Client + Server; Server kann optional client/dist mit ausliefern (SERVE_CLIENT_STATIC=1)
 healthcheckTimeout = 300

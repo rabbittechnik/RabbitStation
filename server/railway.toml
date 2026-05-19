@@ -7,4 +7,5 @@ buildCommand = "npm run build"
 [deploy]
 startCommand = "npm start"
 healthcheckPath = "/api/health"
+# Empfohlen: CONTROL_CENTER_API_TOKEN + ggf. SERVE_CLIENT_STATIC=1 wenn Monorepo-Build client+server
 healthcheckTimeout = 300

@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node scripts/serve-dist.mjs"
+    "start": "node scripts/start-production.mjs",
+    "start:static-only": "node scripts/serve-dist.mjs"
   },
   "dependencies": {
     "html5-qrcode": "^2.3.8",

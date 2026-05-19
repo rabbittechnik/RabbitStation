@@ -12,20 +12,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-export function MarketingFeaturesPage() {
-  return (
-    <Section title="Funktionen">
-      <ul className="list-inside list-disc space-y-2">
-        <li>Schichtplan mit Veröffentlichung und Konfliktprüfung</li>
-        <li>Zeiterfassung, Freigaben und Zuschläge (Nacht, Sonntag, Feiertag)</li>
-        <li>Aufgaben, Dokumente mit Rollen-Sichtbarkeit</li>
-        <li>Mitarbeiter-App und Stations-Tablet</li>
-        <li>Lohn- und Auswertungsmodule</li>
-        <li>Multi-Tenant: jeder Betreiber sieht nur eigene Daten</li>
-      </ul>
-    </Section>
-  )
-}
+export { MarketingFeaturesPage } from './MarketingFeaturesPage'
 
 export function MarketingPricingPage() {
   return (

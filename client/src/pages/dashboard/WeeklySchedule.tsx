@@ -9,6 +9,7 @@ import {
   startOfWeekMonday,
 } from '../../components/schedule/scheduleWeekUtils'
 import { buildRequirementGapResolvedBlocks } from '../../data/defaultShiftRequirements'
+import { useShiftRequirementOptions } from '../../hooks/useShiftRequirementOptions'
 import {
   resolveShiftsForWeekGrid,
   shiftsInWeek,
@@ -32,6 +33,7 @@ import { useViewportScheduleDensity } from '../../hooks/useViewportScheduleDensi
 
 export function WeeklySchedule() {
   const { selectedStation, federalState, stationId, hasPermission, standardWorkTimesJson } = useStation()
+  const shiftOpts = useShiftRequirementOptions()
   const { user } = useAuth()
   const { absences } = useAbsences()
   const { employees } = useEmployees()
@@ -101,8 +103,9 @@ export function WeeklySchedule() {
       federalState,
       shiftsThisWeek,
       standardWorkTimesJson,
+      shiftOpts,
     )
-  }, [weekMonday, stationId, federalState, shiftsThisWeek, standardWorkTimesJson])
+  }, [weekMonday, stationId, federalState, shiftsThisWeek, standardWorkTimesJson, shiftOpts])
 
   const timelineRange = useMemo(
     () => computeTimelineRangeFromWeekBlocks([...allBlocks, ...requirementGapBlocks]),

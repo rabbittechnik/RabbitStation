@@ -3,6 +3,8 @@ import { verifyAdminToken } from '../services/authService.js'
 import { getDb } from '../db/database.js'
 import { buildAccessContext } from '../services/stationAccessService.js'
 import { trialWriteGate } from './trialWriteGate.js'
+import { isControlCenterApiRequest } from './controlCenterApiAuth.js'
+import { jsonErrAdmin } from '../utils/http.js'
 
 /**
  * Schützt alle /api/* Routen außer Health, Login, Public, Mitarbeiter-Zugang und Terminal.
@@ -21,14 +23,27 @@ export function adminApiGate(req: Request, res: Response, next: NextFunction) {
 
   if (!p.startsWith('/api')) return next()
 
+  if (p.startsWith('/api/admin') && isControlCenterApiRequest(req)) {
+    req.controlCenterApiAuth = true
+    return next()
+  }
+
   const h = req.headers.authorization
   const token = typeof h === 'string' && h.startsWith('Bearer ') ? h.slice(7).trim() : ''
   if (!token) {
+    if (p.startsWith('/api/admin')) {
+      jsonErrAdmin(res, 'unauthorized', 'Admin API token missing or invalid', 401)
+      return
+    }
     res.status(401).json({ ok: false, error: 'Nicht angemeldet' })
     return
   }
   const payload = verifyAdminToken(token)
   if (!payload) {
+    if (p.startsWith('/api/admin')) {
+      jsonErrAdmin(res, 'unauthorized', 'Admin API token missing or invalid', 401)
+      return
+    }
     res.status(401).json({ ok: false, error: 'Sitzung abgelaufen' })
     return
   }

@@ -47,6 +47,7 @@ import { TabletLandingPage } from '../pages/terminal/TabletLandingPage'
 import { TabletTokenLayout } from '../pages/terminal/TabletTokenLayout'
 import { SidebarProvider } from '../store/sidebar-context'
 import { RequireAuth } from '../components/auth/RequireAuth'
+import { RequireSetup } from '../components/auth/RequireSetup'
 import { EmployeeAppLayout } from '../layouts/EmployeeAppLayout'
 import { EmployeeAccessPage } from '../pages/employee-app/EmployeeAccessPage'
 import { EmployeeAppPage } from '../pages/employee-app/EmployeeAppPage'
@@ -210,7 +211,11 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
-        element: <AppLayout />,
+        element: (
+          <RequireSetup>
+            <AppLayout />
+          </RequireSetup>
+        ),
         children: [
       {
         path: 'dashboard',

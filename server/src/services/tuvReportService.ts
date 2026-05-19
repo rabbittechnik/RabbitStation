@@ -448,6 +448,18 @@ export function checkCurrentMonth(db: Database, stationId: string) {
   const d = new Date()
   const month = d.getMonth() + 1
   const year = d.getFullYear()
+  const st = db
+    .prepare(`SELECT monthly_tuv_report_enabled FROM stations WHERE id = ?`)
+    .get(stationId) as { monthly_tuv_report_enabled: number | null } | undefined
+  if (st?.monthly_tuv_report_enabled !== 1) {
+    return {
+      required: false,
+      disabled: true,
+      month,
+      year,
+      status: 'disabled' as const,
+    }
+  }
   const rep = findReportByStationMonth(db, stationId, month, year)
   if (!rep) {
     return { required: true, month, year, status: 'missing' as const }

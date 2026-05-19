@@ -178,6 +178,8 @@ export function buildAuthMeUser(db: Database, userId: string) {
     tenant,
     subscription,
     setupRequired: tenant ? !tenant.setupCompleted : false,
+    setupCompleted: tenant?.setupCompleted ?? true,
+    onboardingTourCompleted: tenant?.onboardingTourCompleted ?? true,
     stations,
     stationAccess,
     canSwitchStation,

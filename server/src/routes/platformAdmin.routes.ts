@@ -5,18 +5,13 @@ import { requirePlatformAdmin } from '../middleware/platformAdminGate.js'
 import { tenantToApi } from '../services/tenantService.js'
 import { nowIso } from '../utils/timestamps.js'
 import { appendTenantAudit } from '../services/tenantAuditService.js'
+import { buildAdminHealthPayload } from '../services/adminHealthService.js'
 
 export const platformAdminRouter = Router()
 platformAdminRouter.use(requirePlatformAdmin)
 
 platformAdminRouter.get('/health', (_req, res) => {
-  jsonOk(res, {
-    ok: true,
-    service: 'rabbitstation-pro',
-    product: process.env.APP_NAME ?? 'RabbitStation Pro',
-    timestamp: nowIso(),
-    database: 'sqlite',
-  })
+  jsonOk(res, buildAdminHealthPayload())
 })
 
 platformAdminRouter.get('/tenants', (_req, res) => {
@@ -40,9 +35,7 @@ platformAdminRouter.get('/tenants', (_req, res) => {
 platformAdminRouter.get('/subscriptions/summary', (_req, res) => {
   const db = getDb()
   const summary = db
-    .prepare(
-      `SELECT subscription_status, COUNT(*) as c FROM tenants GROUP BY subscription_status`,
-    )
+    .prepare(`SELECT subscription_status, COUNT(*) as c FROM tenants GROUP BY subscription_status`)
     .all() as { subscription_status: string; c: number }[]
   const expiring = db
     .prepare(
@@ -62,9 +55,7 @@ platformAdminRouter.get('/logs', (req, res) => {
   const limit = Math.min(500, Math.max(1, Number(req.query.limit ?? 100)))
   const db = getDb()
   const rows = db
-    .prepare(
-      `SELECT * FROM tenant_audit_logs ORDER BY created_at DESC LIMIT ?`,
-    )
+    .prepare(`SELECT * FROM tenant_audit_logs ORDER BY created_at DESC LIMIT ?`)
     .all(limit)
   jsonOk(res, { logs: rows })
 })
@@ -83,14 +74,19 @@ platformAdminRouter.get('/security/summary', (_req, res) => {
   jsonOk(res, {
     failedLogins24h: failed?.c ?? 0,
     blockedTenants: blocked?.c ?? 0,
+    activeSupportSessions: 0,
   })
 })
 
 platformAdminRouter.get('/backups/status', (_req, res) => {
+  const configured = Boolean(process.env.BACKUP_PATH?.trim())
   jsonOk(res, {
-    configured: Boolean(process.env.BACKUP_PATH?.trim()),
-    lastBackup: null,
-    message: 'Backup-Integration für Produktivbetrieb vorbereiten.',
+    configured,
+    lastBackupAt: null,
+    lastBackupStatus: configured ? 'unknown' : null,
+    nextBackupAt: null,
+    sizeBytes: 0,
+    message: configured ? undefined : 'Backup system not configured',
   })
 })
 

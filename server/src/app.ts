@@ -32,11 +32,21 @@ import { publicRouter } from './routes/public.routes.js'
 import { tenantRouter } from './routes/tenant.routes.js'
 import { setupRouter } from './routes/setup.routes.js'
 import { platformAdminRouter } from './routes/platformAdmin.routes.js'
+import { attachClientStatic } from './attachClientStatic.js'
 
 function parseCorsOrigins(): boolean | string[] {
-  const raw = process.env.CLIENT_ORIGIN?.trim()
-  if (!raw || raw === '*') return true
-  return raw.split(',').map((s) => s.trim()).filter(Boolean)
+  const origins = new Set<string>()
+  const clientOrigin = process.env.CLIENT_ORIGIN?.trim()
+  const publicApp = process.env.PUBLIC_APP_URL?.trim().replace(/\/$/, '')
+  if (clientOrigin && clientOrigin !== '*') {
+    for (const o of clientOrigin.split(',')) {
+      const t = o.trim()
+      if (t) origins.add(t)
+    }
+  }
+  if (publicApp) origins.add(publicApp)
+  if (origins.size === 0) return true
+  return [...origins]
 }
 
 export function createApp() {
@@ -50,7 +60,12 @@ export function createApp() {
   app.use(express.json({ limit: '2mb' }))
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, service: 'rabbitstation-pro', product: process.env.APP_NAME ?? 'RabbitStation Pro' })
+    res.json({
+      ok: true,
+      service: 'RabbitStation Haupt-App',
+      product: process.env.APP_NAME ?? 'RabbitStation Pro',
+      time: new Date().toISOString(),
+    })
   })
 
   app.use('/api/public', publicRouter)
@@ -90,7 +105,19 @@ export function createApp() {
   app.use('/api/station-hub', stationHubRouter)
   app.use('/api/dev', devRouter)
 
-  app.use((_req, res) => {
+  if (process.env.SERVE_CLIENT_STATIC === '1' || process.env.NODE_ENV === 'production') {
+    attachClientStatic(app)
+  }
+
+  app.use((req, res) => {
+    const p = (req.originalUrl ?? req.url ?? '').split('?')[0] || req.path
+    if (p.startsWith('/api')) {
+      return res.status(404).json({
+        ok: false,
+        error: 'not_found',
+        message: 'API route not found',
+      })
+    }
     res.status(404).json({ ok: false, error: 'Nicht gefunden' })
   })
 

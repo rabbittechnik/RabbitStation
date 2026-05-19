@@ -262,6 +262,23 @@ export function GeneralSettingsPage() {
             onChange={(e) => setField('standard_work_times_json', e.target.value)}
           />
         </label>
+        <Card className="mt-6">
+          <h3 className="text-sm font-semibold text-[var(--text-main)]">Einführung</h3>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Die geführte Tour durch die wichtigsten Bereiche der App erneut starten.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4"
+            onClick={async () => {
+              await apiSend('POST', '/setup/tour-reset', {})
+              window.dispatchEvent(new CustomEvent('rabbitstation-restart-tour'))
+            }}
+          >
+            Einführung erneut starten
+          </Button>
+        </Card>
         {canEdit ? (
           <Button type="button" onClick={() => void save()} disabled={loading}>
             Speichern

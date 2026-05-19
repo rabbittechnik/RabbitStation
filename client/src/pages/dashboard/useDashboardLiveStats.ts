@@ -3,6 +3,7 @@ import { addDays, startOfWeekMonday } from '../../components/schedule/scheduleWe
 import type { ScheduleShift } from '../../data/mockSchedule'
 import { toISODate } from '../../data/mockSchedule'
 import { calculateOpenShiftsForWeek, type OpenShiftWeekSummary } from '../../data/defaultShiftRequirements'
+import { useShiftRequirementOptions } from '../../hooks/useShiftRequirementOptions'
 import { apiGet } from '../../services/api'
 import { localTodayYmd } from '../../utils/dateFormat'
 import { useAbsences } from '../../context/absences-context'
@@ -87,6 +88,8 @@ export function useDashboardLiveStats() {
     void reload()
   }, [reload])
 
+  const shiftOpts = useShiftRequirementOptions()
+
   const openShiftsWeek = useMemo(() => {
     if (!stationId) return emptyOpenSummary()
     return calculateOpenShiftsForWeek(
@@ -96,8 +99,9 @@ export function useDashboardLiveStats() {
       stationId,
       federalState,
       standardWorkTimesJson,
+      shiftOpts,
     )
-  }, [stationId, federalState, standardWorkTimesJson, weekShifts, openShifts, weekAnchor.weekStart])
+  }, [stationId, federalState, standardWorkTimesJson, weekShifts, openShifts, weekAnchor.weekStart, shiftOpts])
 
   const stats = useMemo(() => {
     const today = localTodayYmd()

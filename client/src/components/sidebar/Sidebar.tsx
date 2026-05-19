@@ -115,6 +115,7 @@ function NavGroupSection({
             <NavLink
               key={c.to}
               to={c.to}
+              data-tour={c.dataTour}
               onClick={onNavigate}
               className={() => {
                 const active = pathMatches(pathname, c.to)

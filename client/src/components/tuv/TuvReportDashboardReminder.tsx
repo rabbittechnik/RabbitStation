@@ -41,6 +41,8 @@ export function TuvReportDashboardReminder() {
 
   if (!show) return null
 
+  if (check?.disabled || check?.status === 'disabled') return null
+
   if (error) {
     return (
       <div className="rounded-lg border border-rose-500/35 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">

@@ -1,10 +1,9 @@
-# Client-Service: In Railway „Root Directory“ = client setzen
-# oder Config-as-Code-Pfad: client/railway.toml
+# Railway: Root Directory = Repo-Root empfohlen; alternativ client/ mit buildCommand cd ..
 [build]
 builder = "railpack"
-buildCommand = "npm run build"
+buildCommand = "cd .. && npm run build"
 
 [deploy]
-startCommand = "npm run start"
-healthcheckPath = "/"
+startCommand = "node scripts/start-production.mjs"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 300

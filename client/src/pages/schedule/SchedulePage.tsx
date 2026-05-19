@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { buildRequirementGapResolvedBlocks } from '../../data/defaultShiftRequirements'
+import { useShiftRequirementOptions } from '../../hooks/useShiftRequirementOptions'
 import {
   resolveShiftsForWeekGrid,
   shiftsInWeek,
@@ -61,6 +62,7 @@ import type { ShiftDraft } from '../../components/schedule/shift/shiftConflicts'
 
 export function SchedulePage() {
   const { federalState, stationId, hasPermission, selectedStation, standardWorkTimesJson } = useStation()
+  const shiftOpts = useShiftRequirementOptions()
   const { user } = useAuth()
   const canCorrectTime = canCorrectStampTimes(user)
   const { absences } = useAbsences()
@@ -165,8 +167,9 @@ export function SchedulePage() {
       federalState,
       shiftsThisWeek,
       standardWorkTimesJson,
+      shiftOpts,
     )
-  }, [weekMonday, stationId, federalState, shiftsThisWeek, standardWorkTimesJson])
+  }, [weekMonday, stationId, federalState, shiftsThisWeek, standardWorkTimesJson, shiftOpts])
 
   const timelineRange = useMemo(
     () => computeTimelineRangeFromWeekBlocks([...allBlocks, ...requirementGapBlocks]),

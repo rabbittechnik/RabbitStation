@@ -80,8 +80,9 @@ export type TuvReportDetail = { report: TuvReportApi; items: TuvReportItemApi[] 
 
 export type TuvCurrentMonthCheck = {
   required: boolean
+  disabled?: boolean
   month: number
   year: number
-  status: 'missing' | 'in_progress' | 'completed' | 'printed'
+  status: 'missing' | 'in_progress' | 'completed' | 'printed' | 'disabled'
   reportId?: string
 }

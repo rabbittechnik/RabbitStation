@@ -114,6 +114,19 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  if (pathname.startsWith('/api/')) {
+    res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(
+      JSON.stringify({
+        ok: false,
+        error: 'api_not_on_frontend_host',
+        message:
+          'Diese URL liefert nur das Frontend. Bitte RABBITSTATION_API_URL auf den API-Server setzen (Express mit /api/health), nicht auf den Static-Client-Service.',
+      }),
+    )
+    return
+  }
+
   const candidate = fileUnderDist(pathname)
   if (!candidate) {
     res.writeHead(403).end()

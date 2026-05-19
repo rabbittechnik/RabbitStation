@@ -16,7 +16,8 @@ import {
   DEFAULT_FETCH_TIMEOUT_MS,
   type ApiEnvelope,
 } from '../services/api'
-import { fetchWithTimeout, isAbortError } from '../lib/fetchWithTimeout'
+import { fetchWithTimeout } from '../lib/fetchWithTimeout'
+import { loginErrorMessage } from '../lib/authErrors'
 
 export type StationInfo = {
   id: string
@@ -58,6 +59,8 @@ export type AuthUser = {
   tenantId?: string
   platformRole?: string
   setupRequired?: boolean
+  setupCompleted?: boolean
+  onboardingTourCompleted?: boolean
   subscription?: {
     canWrite: boolean
     status: string
@@ -69,6 +72,7 @@ export type AuthUser = {
     subscriptionStatus: string
     trialDaysLeft: number | null
     setupCompleted: boolean
+    onboardingTourCompleted?: boolean
   }
 }
 
@@ -137,17 +141,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       res = await fetchWithTimeout(`${API_BASE}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ username, password, rememberMe }),
         timeoutMs: DEFAULT_FETCH_TIMEOUT_MS,
       })
     } catch (e) {
-      if (isAbortError(e)) throw new Error('Zeitüberschreitung — Server antwortet nicht.')
-      throw e
+      console.error('[auth] login network error', e)
+      throw new Error(loginErrorMessage(e))
     }
-    const json = (await res.json()) as ApiEnvelope<{ token: string; user: AuthUser }>
+
+    let json: ApiEnvelope<{ token: string; user: AuthUser }>
+    try {
+      const text = await res.text()
+      json = JSON.parse(text) as ApiEnvelope<{ token: string; user: AuthUser }>
+    } catch (e) {
+      console.error('[auth] login invalid response', res.status, e)
+      throw new Error(loginErrorMessage(e, res))
+    }
+
     if (!res.ok || !json.ok) {
-      throw new Error(!json.ok ? json.error : 'Anmeldung fehlgeschlagen')
+      const msg =
+        res.status === 401 || res.status === 403
+          ? loginErrorMessage(null, res)
+          : (!json.ok ? json.error : loginErrorMessage(null, res))
+      if (!res.ok) console.warn('[auth] login failed', res.status, msg)
+      throw new Error(msg || loginErrorMessage(null, res))
     }
     setAdminToken(json.data.token, rememberMe)
     setToken(json.data.token)

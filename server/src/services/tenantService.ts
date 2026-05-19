@@ -17,6 +17,7 @@ export type TenantRow = {
   cancelled_at: string | null
   blocked_reason: string | null
   setup_completed: number
+  onboarding_tour_completed?: number
   contact_email: string | null
   contact_phone: string | null
   address_json: string | null
@@ -96,6 +97,7 @@ export function tenantToApi(t: TenantRow) {
     trialEnd: t.trial_end,
     trialDaysLeft,
     setupCompleted: t.setup_completed === 1,
+    onboardingTourCompleted: (t.onboarding_tour_completed ?? 0) === 1,
     paymentProvider: t.payment_provider,
     currentPeriodStart: t.current_period_start,
     currentPeriodEnd: t.current_period_end,

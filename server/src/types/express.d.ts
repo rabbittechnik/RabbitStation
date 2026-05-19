@@ -8,6 +8,8 @@ declare global {
         roleId: string
       }
       accessContext?: import('../services/stationAccessService.js').AccessContext
+      /** Server-to-Server: Control Center mit CONTROL_CENTER_API_TOKEN */
+      controlCenterApiAuth?: boolean
     }
   }
 }
