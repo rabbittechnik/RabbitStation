@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { Router } from 'express'
 import { getDb } from '../db/database.js'
 import { jsonOk } from '../utils/http.js'
@@ -14,9 +15,14 @@ import {
   SupportSessionError,
   countActiveSupportSessions,
 } from '../services/supportSessionService.js'
-import { getBackupDir } from '../config/dataPaths.js'
 import { getTenantById } from '../services/tenantService.js'
 import { sendAdminTestMail } from '../services/mailTestService.js'
+import {
+  createBackup,
+  getBackupStatusResponse,
+  listBackupFiles,
+  resolveBackupDownloadPath,
+} from '../services/backupService.js'
 
 export const platformAdminRouter = Router()
 platformAdminRouter.use(requirePlatformAdmin)
@@ -195,16 +201,43 @@ platformAdminRouter.post('/support-sessions/:id/end', (req, res) => {
 })
 
 platformAdminRouter.get('/backups/status', (_req, res) => {
-  const backupDir = getBackupDir()
-  const configured = Boolean(process.env.BACKUP_DIR?.trim() || process.env.BACKUP_PATH?.trim() || backupDir)
-  jsonOk(res, {
-    configured,
-    lastBackupAt: null,
-    lastBackupStatus: configured ? 'unknown' : null,
-    nextBackupAt: null,
-    sizeBytes: 0,
-    message: configured ? undefined : 'Backup system not configured',
-  })
+  res.json(getBackupStatusResponse())
+})
+
+platformAdminRouter.get('/backups', (_req, res) => {
+  res.json({ ok: true, backups: listBackupFiles() })
+})
+
+platformAdminRouter.post('/backups/create', async (req, res) => {
+  try {
+    const body = req.body as { includeUploads?: boolean; includeDocuments?: boolean }
+    const backup = await createBackup({
+      includeUploads: body.includeUploads !== false,
+      includeDocuments: body.includeDocuments !== false,
+      type: 'manual',
+      req,
+    })
+    res.status(201).json({
+      ok: true,
+      backup: {
+        fileName: backup.fileName,
+        path: backup.path,
+        sizeBytes: backup.sizeBytes,
+        createdAt: backup.createdAt,
+      },
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Backup fehlgeschlagen'
+    res.status(500).json({ ok: false, message })
+  }
+})
+
+platformAdminRouter.get('/backups/:fileName/download', (req, res) => {
+  const filePath = resolveBackupDownloadPath(String(req.params.fileName ?? ''))
+  if (!filePath) {
+    return res.status(400).json({ ok: false, message: 'Ungültiger Backup-Dateiname' })
+  }
+  res.download(filePath, path.basename(filePath))
 })
 
 platformAdminRouter.patch('/tenants/:tenantId/subscription', (req, res) => {

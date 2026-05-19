@@ -19,6 +19,20 @@ BACKUP_DIR=/data/backups
 LOG_DIR=/data/logs
 
 DEMO_SEED_ENABLED=false
+
+# Backup (optional)
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE_CRON=0 3 * * *
+BACKUP_RETENTION_DAYS=30
+
+# Remote-Backup S3-kompatibel (optional, z. B. Cloudflare R2)
+# BACKUP_REMOTE_ENABLED=true
+# BACKUP_REMOTE_PROVIDER=s3
+# BACKUP_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+# BACKUP_S3_BUCKET=rabbitstation-backups
+# BACKUP_S3_REGION=auto
+# BACKUP_S3_ACCESS_KEY_ID=
+# BACKUP_S3_SECRET_ACCESS_KEY=
 ```
 
 Optional (Legacy-Aliase werden weiterhin unterstützt):
@@ -49,12 +63,28 @@ Migrations completed
 Demo seed enabled: false
 ```
 
+## Backup-API (Plattform-Admin)
+
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| `POST` | `/api/admin/backups/create` | Manuelles Backup (ZIP) |
+| `GET` | `/api/admin/backups/status` | Status des letzten Backups |
+| `GET` | `/api/admin/backups` | Liste lokaler Backups |
+| `GET` | `/api/admin/backups/:fileName/download` | ZIP herunterladen |
+
+Zugriff: `saas_owner`, `saas_superadmin` oder `CONTROL_CENTER_API_TOKEN`.
+
+Backup-Dateien: `rabbitstation-backup-YYYY-MM-DD-HHMM.zip` in `BACKUP_DIR` (Standard `/data/backups`).
+
+Inhalt: `rabbitstation.db`, optional `uploads/`, `documents/`, `backup-manifest.json`.
+
 ## Health-Check
 
 `GET /api/admin/health` liefert u. a.:
 
 - `database.path`, `database.exists`, `database.sizeBytes`, `database.persistentVolume`
-- `storage.dataPath`, `storage.uploadDir`, `storage.documentsDir`, …
+- `backups.status`, `backups.lastBackupAt`, `backups.localBackupsCount`, `backups.remoteEnabled`
+- `storage.dataPath`, `storage.backupDirWritable`, `storage.databasePath`, …
 
 Warnung, wenn die DB in Production **nicht** unter `/data` liegt:
 

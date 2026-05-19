@@ -149,9 +149,11 @@ export type StorageHealthSnapshot = {
     dataPath: string
     dataPathExists: boolean
     dataPathWritable: boolean
+    backupDir: string
+    backupDirWritable: boolean
+    databasePath: string
     uploadDir: string
     documentsDir: string
-    backupDir: string
     logDir: string
     message?: string
   }
@@ -177,6 +179,9 @@ export function buildStorageHealthSnapshot(): StorageHealthSnapshot {
   const dataPath = isProductionEnv() ? PRODUCTION_DATA_ROOT : getDataRoot()
   const dataPathExists = fs.existsSync(dataPath)
   const dataPathWritable = dataPathExists && isDirectoryWritable(dataPath)
+  const backupDir = getBackupDir()
+  const backupDirExists = fs.existsSync(backupDir)
+  const backupDirWritable = backupDirExists && isDirectoryWritable(backupDir)
 
   let storageStatus: 'ok' | 'warning' | 'error' = 'ok'
   let storageMessage: string | undefined
@@ -202,9 +207,11 @@ export function buildStorageHealthSnapshot(): StorageHealthSnapshot {
       dataPath,
       dataPathExists,
       dataPathWritable,
+      backupDir,
+      backupDirWritable,
+      databasePath: dbPath,
       uploadDir: getUploadDir(),
       documentsDir: getDocumentsDir(),
-      backupDir: getBackupDir(),
       logDir: getLogDir(),
       ...(storageMessage ? { message: storageMessage } : {}),
     },

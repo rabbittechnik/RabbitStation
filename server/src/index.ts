@@ -1,8 +1,10 @@
 import 'dotenv/config'
 import { createApp } from './app.js'
 import { initDatabase } from './db/database.js'
+import { startBackupScheduler } from './services/backupScheduler.js'
 
 initDatabase()
+startBackupScheduler()
 
 const app = createApp()
 const PORT = Number(process.env.PORT) || 3001
