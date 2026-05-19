@@ -41,24 +41,26 @@ export type SmtpFailureDetails = {
   hint?: string
 }
 
-let cachedTransport: Transporter | null | undefined
-
 function createTransport(): Transporter | null {
   const opts = getNodemailerTransportOptions()
   if (!opts) return null
   return nodemailer.createTransport(opts)
 }
 
+/**
+ * Always creates a fresh transport from current process.env values.
+ * No caching — ensures env var changes (e.g. Railway redeploys) are always reflected.
+ */
 export function getSmtpTransport(): Transporter | null {
-  if (cachedTransport === undefined) {
-    cachedTransport = createTransport()
-  }
-  return cachedTransport
+  return createTransport()
 }
 
-/** Nur für Tests: Transport-Cache zurücksetzen. */
+/**
+ * No-op kept for test compatibility.
+ * Caching was removed so env vars are always read fresh on each call.
+ */
 export function resetSmtpTransportCache(): void {
-  cachedTransport = undefined
+  // no-op: transport is no longer cached
 }
 
 function normalizeSendResult(info: SentMessageInfo): SendMailResult {

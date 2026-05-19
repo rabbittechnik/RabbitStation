@@ -18,6 +18,7 @@ import {
 import { getTenantById } from '../services/tenantService.js'
 import { mailTestFailureToJson, sendAdminTestMail } from '../services/mailTestService.js'
 import { buildSmtpFailureDetails } from '../services/smtpMailTransport.js'
+import { getSmtpConfigSnapshot } from '../services/smtpConfig.js'
 import {
   createBackup,
   getBackupStatusResponse,
@@ -62,6 +63,20 @@ platformAdminRouter.post('/mail/test', async (req, res) => {
       ...buildSmtpFailureDetails('send', err),
     })
   }
+})
+
+platformAdminRouter.get('/mail/config-check', (_req, res) => {
+  const snap = getSmtpConfigSnapshot()
+  return res.status(200).json({
+    ok: true,
+    smtpHost: snap.smtpHost ?? null,
+    smtpPort: snap.smtpPort ?? null,
+    secure: snap.smtpSecure ?? null,
+    smtpUserSet: !snap.smtpUserMissing && Boolean(snap.smtpHost),
+    smtpPassSet: !snap.smtpPassMissing && Boolean(snap.smtpHost),
+    fromAddress: snap.mailFromAddress ?? null,
+    smtpConfigured: snap.smtpConfigured,
+  })
 })
 
 platformAdminRouter.get('/tenants', (_req, res) => {

@@ -3,6 +3,21 @@ export type MailFromConfig = {
   address: string
 }
 
+/** Log SMTP config at module load time (no secrets). */
+function logSmtpConfigOnLoad(): void {
+  const host = process.env.SMTP_HOST?.trim()
+  const port = Number(process.env.SMTP_PORT) || 587
+  const secureRaw = String(process.env.SMTP_SECURE || '').toLowerCase()
+  const secure = secureRaw === 'true' || secureRaw === '1' ? true : secureRaw === 'false' || secureRaw === '0' ? false : port === 465
+  const userSet = Boolean(process.env.SMTP_USER?.trim())
+  const passSet = Boolean(process.env.SMTP_PASS?.trim())
+  console.info(
+    `[smtp] config loaded: host=${host ?? '(not set)'} port=${port} secure=${secure} userSet=${userSet} passSet=${passSet}`,
+  )
+}
+
+logSmtpConfigOnLoad()
+
 export type SmtpConfigSnapshot = {
   smtpConfigured: boolean
   smtpHost?: string
@@ -32,8 +47,9 @@ export function isSmtpConfigured(): boolean {
 
 /** Port 465 → SSL (secure). Port 587 + SMTP_SECURE=false → STARTTLS (secure false, requireTLS). */
 export function resolveSmtpSecure(port: number, secureRaw?: string): boolean {
-  if (secureRaw === '1' || secureRaw === 'true') return true
-  if (secureRaw === '0' || secureRaw === 'false') return false
+  const normalized = String(secureRaw ?? '').trim().toLowerCase()
+  if (normalized === '1' || normalized === 'true') return true
+  if (normalized === '0' || normalized === 'false') return false
   return port === 465
 }
 
