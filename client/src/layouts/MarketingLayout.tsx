@@ -40,9 +40,10 @@ export function MarketingLayout() {
       <main>
         <Outlet />
       </main>
-      <footer className="mt-16 border-t border-cyan-500/15 py-10 text-center text-sm text-[#7a8aa8]">
-        <p className="mb-3">RabbitStation Pro – SaaS für Tankstellenbetreiber</p>
-        <div className="flex flex-wrap justify-center gap-4">
+      <footer className="mt-16 border-t border-cyan-500/15 bg-[#07111f]/80 py-12 text-center text-sm text-[#94a3b8]">
+        <p className="mb-1 text-base font-medium text-cyan-100/90">RabbitStation Pro</p>
+        <p className="mb-6 text-xs uppercase tracking-wider text-[#64748b]">SaaS für Tankstellenbetreiber</p>
+        <div className="flex flex-wrap justify-center gap-6">
           <Link to="/impressum" className="hover:text-cyan-200">
             Impressum
           </Link>

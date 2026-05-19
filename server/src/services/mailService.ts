@@ -1,3 +1,5 @@
+import { getMailFrom, isSmtpConfigured, sendViaSmtp } from './smtpMailTransport.js'
+
 export type MailTemplateKey =
   | 'welcome_registration'
   | 'email_verify'
@@ -10,7 +12,7 @@ export type MailTemplateKey =
   | 'support_access_started'
 
 const TEMPLATE_SUBJECTS: Record<MailTemplateKey, string> = {
-  welcome_registration: 'Willkommen bei RabbitStation Pro',
+  welcome_registration: 'Willkommen bei RabbitStation Pro – Ihre Testphase wurde gestartet',
   email_verify: 'E-Mail-Adresse bestätigen – RabbitStation Pro',
   password_reset: 'Passwort zurücksetzen – RabbitStation Pro',
   employee_invite: 'Einladung zu RabbitStation Pro',
@@ -21,7 +23,7 @@ const TEMPLATE_SUBJECTS: Record<MailTemplateKey, string> = {
   support_access_started: 'Support-Zugriff – RabbitStation Pro',
 }
 
-/** SMTP optional – ohne Konfiguration nur Log/Preview (kein Hardcoding von Zugangsdaten). */
+/** SMTP optional – ohne Konfiguration nur Log (Development) bzw. Warning (Production). */
 export async function sendTemplateMail(
   to: string,
   template: MailTemplateKey,
@@ -29,23 +31,50 @@ export async function sendTemplateMail(
 ): Promise<{ sent: boolean; preview?: string }> {
   const appName = process.env.APP_NAME?.trim() || 'RabbitStation Pro'
   const subject = TEMPLATE_SUBJECTS[template]
-  const body = renderTemplate(template, { ...vars, appName })
-  const host = process.env.SMTP_HOST?.trim()
-  if (!host) {
-    console.info(`[mail:stub] ${template} → ${to}\n${subject}\n${body}`)
-    return { sent: false, preview: body }
+  const text = renderTemplate(template, { ...vars, appName })
+
+  if (!isSmtpConfigured()) {
+    const isDev = process.env.NODE_ENV !== 'production'
+    if (isDev) {
+      console.info(`[mail:stub] ${template} → ${to}\n${subject}\n${text}`)
+    } else {
+      console.warn(`[mail:stub] SMTP nicht konfiguriert – ${template} → ${to} nicht gesendet`)
+    }
+    return { sent: false, preview: text }
   }
-  console.info(`[mail:queued] ${template} → ${to} (SMTP_HOST=${host})`)
-  return { sent: false, preview: body }
+
+  try {
+    await sendViaSmtp({
+      to,
+      subject,
+      html: `<pre style="font-family:Arial,sans-serif;white-space:pre-wrap;">${escapeHtml(text)}</pre>`,
+      text,
+    })
+    console.info(`[mail:sent] ${template} → ${to}`)
+    return { sent: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`[mail:error] ${template} → ${to}:`, message)
+    return { sent: false, preview: text }
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function renderTemplate(template: MailTemplateKey, vars: Record<string, string>): string {
   const lines: Record<MailTemplateKey, string[]> = {
     welcome_registration: [
-      `Hallo ${vars.displayName || ''},`,
+      `Hallo ${vars.displayName || vars.name || ''},`,
       '',
       `willkommen bei ${vars.appName}!`,
       `Dein Konto für „${vars.companyName || 'Ihr Betrieb'}“ wurde angelegt.`,
+      vars.stationName ? `Station: ${vars.stationName}` : '',
       vars.trialEnd ? `Deine 7-Tage-Testphase endet am ${vars.trialEnd}.` : '',
       vars.setupUrl ? `Setup starten: ${vars.setupUrl}` : '',
     ],
@@ -64,3 +93,5 @@ function renderTemplate(template: MailTemplateKey, vars: Record<string, string>)
   }
   return lines[template].filter(Boolean).join('\n')
 }
+
+export { getMailFrom, isSmtpConfigured }

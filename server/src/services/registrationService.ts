@@ -5,6 +5,7 @@ import { nowIso } from '../utils/timestamps.js'
 import { FULL_STATION_PERMISSIONS } from '../constants/permissions.js'
 import { appendTenantAudit } from './tenantAuditService.js'
 import { sendTemplateMail } from './mailService.js'
+import { sendRegistrationWelcomeEmail } from './registrationWelcomeEmailService.js'
 import { loginAdminUser } from './authService.js'
 import { ensureStationStatutoryHolidaysSeeded } from './stationExtraHolidayService.js'
 import { tenantToApi } from './tenantService.js'
@@ -177,11 +178,18 @@ export function registerNewTenant(db: Database, body: RegisterBody, req?: import
   })
 
   const publicUrl = (process.env.PUBLIC_APP_URL ?? 'http://localhost:5173').replace(/\/$/, '')
-  void sendTemplateMail(email, 'welcome_registration', {
-    displayName,
+  void sendRegistrationWelcomeEmail({
+    to: email,
+    name: displayName,
     companyName,
-    trialEnd: trialEnd.toLocaleDateString('de-DE'),
+    stationName,
+    trialEnd,
     setupUrl: `${publicUrl}/setup`,
+    loginUrl: `${publicUrl}/login`,
+    db,
+    tenantId,
+    userId,
+    req,
   })
 
   const auth = loginAdminUser(db, { username, password, rememberMe: true })

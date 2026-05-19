@@ -1,52 +1,14 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+export { MarketingHomePage } from './MarketingHomePage'
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mx-auto max-w-4xl px-4 py-12">
       <h1 className="mb-6 text-3xl font-semibold text-cyan-100">{title}</h1>
       <div className="space-y-4 leading-relaxed text-[#b8c8e8]">{children}</div>
     </section>
-  )
-}
-
-export function MarketingHomePage() {
-  return (
-    <>
-      <section className="relative overflow-hidden px-4 py-20 text-center">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(34,211,238,0.12),_transparent_60%)]" />
-        <div className="relative mx-auto max-w-3xl">
-          <p className="mb-3 text-sm uppercase tracking-widest text-cyan-400/80">Tankstellen-SaaS</p>
-          <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-            RabbitStation <span className="text-fuchsia-300">Pro</span>
-          </h1>
-          <p className="mt-6 text-lg text-[#a8b8d8]">
-            Schichtplan, Zeiterfassung, Zuschläge, Aufgaben und Dokumente – speziell für Tankstellenbetreiber.
-            Mehrere Stationen, ein Konto, saubere Mandantentrennung.
-          </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link
-              to="/registrieren"
-              className="rounded-xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 px-8 py-3 font-medium text-[#060b14]"
-            >
-              7 Tage kostenlos testen
-            </Link>
-            <Link
-              to="/demo"
-              className="rounded-xl border border-cyan-500/40 px-8 py-3 text-cyan-200 hover:bg-cyan-500/10"
-            >
-              Demo anfragen
-            </Link>
-          </div>
-        </div>
-      </section>
-      <Section title="Für wen ist RabbitStation Pro?">
-        <p>
-          Für unabhängige Tankstellenbetreiber und kleine Ketten, die Schichtplanung, Zeiterfassung mit Zuschlägen,
-          Feiertagslogik, Lohnprüfung, Aufgaben, Dokumente und Tablet-Betrieb in einer Lösung bündeln möchten.
-        </p>
-      </Section>
-    </>
   )
 }
 
