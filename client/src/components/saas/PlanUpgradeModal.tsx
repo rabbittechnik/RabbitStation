@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom'
 import type { FeatureKey } from '../../data/planFeatures'
+import { FEATURE_MIN_PLAN } from '../../data/planFeatures'
+import { usePlanUpgrade } from '../../context/plan-upgrade-context'
 
 type PlanUpgradeModalProps = {
   open: boolean
@@ -16,8 +17,19 @@ export function PlanUpgradeModal({
   featureTitle,
   requiredPlan,
   description,
+  feature,
 }: PlanUpgradeModalProps) {
+  const { isLoggedIn, openPlanUpgrade } = usePlanUpgrade()
+  const targetPlan = FEATURE_MIN_PLAN[feature]
+
   if (!open) return null
+
+  const cta =
+    isLoggedIn ?
+      targetPlan === 'multi_station' ?
+        'Multi-Station testen'
+      : 'Pro 7 Tage testen'
+    : `${requiredPlan} testen`
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" role="dialog">
@@ -27,13 +39,16 @@ export function PlanUpgradeModal({
           {description ?? `${featureTitle} ist im ${requiredPlan}-Paket enthalten.`}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            to="/preise"
+          <button
+            type="button"
+            onClick={() => {
+              onClose()
+              openPlanUpgrade(targetPlan)
+            }}
             className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-[#060b14] hover:bg-cyan-400"
-            onClick={onClose}
           >
-            {requiredPlan} ansehen
-          </Link>
+            {cta}
+          </button>
           <button
             type="button"
             onClick={onClose}

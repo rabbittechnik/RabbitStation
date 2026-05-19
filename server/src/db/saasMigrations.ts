@@ -112,6 +112,11 @@ export function runSaasMigrations(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_tablet_pair_code ON tablet_pairing_codes(code, expires_at);
   `)
 
+  addCol(db, 'tenants', 'pro_trial_started_at', 'pro_trial_started_at TEXT')
+  addCol(db, 'tenants', 'pro_trial_used', 'pro_trial_used INTEGER NOT NULL DEFAULT 0')
+  addCol(db, 'tenants', 'multi_trial_started_at', 'multi_trial_started_at TEXT')
+  addCol(db, 'tenants', 'multi_trial_used', 'multi_trial_used INTEGER NOT NULL DEFAULT 0')
+
   addCol(db, 'users', 'tenant_id', 'tenant_id TEXT')
   addCol(db, 'users', 'platform_role', 'platform_role TEXT')
   addCol(db, 'users', 'email_verified', 'email_verified INTEGER NOT NULL DEFAULT 0')

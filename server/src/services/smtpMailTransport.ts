@@ -1,6 +1,6 @@
 import nodemailer, { type SentMessageInfo, type Transporter } from 'nodemailer'
-import { classifySmtpError } from './smtpMailErrors.js'
-import { getMailFrom, isSmtpConfigured } from './smtpConfig.js'
+import { classifySmtpError, type ClassifiedSmtpError } from './smtpMailErrors.js'
+import { getMailFrom, getNodemailerTransportOptions, isSmtpConfigured } from './smtpConfig.js'
 
 export type { MailFromConfig, SmtpConfigSnapshot } from './smtpConfig.js'
 export { getMailFrom, getSmtpConfigSnapshot, isSmtpConfigured } from './smtpConfig.js'
@@ -19,32 +19,34 @@ export type SendMailResult = {
   response?: string
 }
 
+export type SmtpOperationStep = 'verify' | 'send'
+
+/** Gesamtes verify/send inkl. Nodemailer-Timeouts – spätestens nach ~20s abbrechen. */
+export const SMTP_OPERATION_TIMEOUT_MS = 20_000
+
 export type VerifyMailTransportResult =
   | { ok: true }
-  | { ok: false; errorCode: string; safeMessage: string; smtpResponse?: string }
+  | ({ ok: false } & SmtpFailureDetails)
+
+export type SmtpFailureDetails = {
+  step: SmtpOperationStep
+  errorCode: string
+  safeMessage: string
+  smtpHost?: string
+  smtpPort?: number
+  secure?: boolean
+  responseCode?: number
+  command?: string
+  smtpResponse?: string
+  hint?: string
+}
 
 let cachedTransport: Transporter | null | undefined
 
 function createTransport(): Transporter | null {
-  const host = process.env.SMTP_HOST?.trim()
-  if (!host) return null
-
-  const port = Number(process.env.SMTP_PORT) || 587
-  const secureRaw = process.env.SMTP_SECURE?.trim()
-  const secure =
-    secureRaw === '1' || secureRaw === 'true' ? true
-    : secureRaw === '0' || secureRaw === 'false' ? false
-    : port === 465
-
-  const user = process.env.SMTP_USER?.trim()
-  const pass = process.env.SMTP_PASS?.trim()
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: user && pass ? { user, pass } : undefined,
-  })
+  const opts = getNodemailerTransportOptions()
+  if (!opts) return null
+  return nodemailer.createTransport(opts)
 }
 
 export function getSmtpTransport(): Transporter | null {
@@ -70,26 +72,65 @@ function normalizeSendResult(info: SentMessageInfo): SendMailResult {
   }
 }
 
+export function buildSmtpFailureDetails(
+  step: SmtpOperationStep,
+  err: unknown,
+  classified?: ClassifiedSmtpError,
+): SmtpFailureDetails {
+  const c = classified ?? classifySmtpError(err)
+  const e = (err && typeof err === 'object' ? err : {}) as {
+    responseCode?: number
+    command?: string
+  }
+  const opts = getNodemailerTransportOptions()
+  return {
+    step,
+    errorCode: c.errorCode,
+    safeMessage: c.safeMessage,
+    smtpHost: opts?.host,
+    smtpPort: opts?.port,
+    secure: opts?.secure,
+    responseCode: typeof e.responseCode === 'number' ? e.responseCode : undefined,
+    command: typeof e.command === 'string' ? e.command : undefined,
+    smtpResponse: c.smtpResponse,
+    hint: c.hint,
+  }
+}
+
+async function withSmtpOperationTimeout<T>(step: SmtpOperationStep, fn: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(
+          Object.assign(new Error(`SMTP ${step} Zeitüberschreitung nach ${SMTP_OPERATION_TIMEOUT_MS}ms`), {
+            code: 'ETIMEDOUT',
+          }),
+        )
+      }, SMTP_OPERATION_TIMEOUT_MS)
+    })
+    return await Promise.race([fn(), timeoutPromise])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 /** Prüft SMTP-Verbindung und Login (nodemailer verify). */
 export async function verifyMailTransport(): Promise<VerifyMailTransportResult> {
   const transport = getSmtpTransport()
   if (!transport) {
     return {
       ok: false,
-      errorCode: 'smtp_not_configured',
-      safeMessage: 'SMTP ist nicht konfiguriert.',
+      ...buildSmtpFailureDetails('verify', { code: 'smtp_not_configured' }),
     }
   }
   try {
-    await transport.verify()
+    await withSmtpOperationTimeout('verify', () => transport.verify())
     return { ok: true }
   } catch (err) {
-    const c = classifySmtpError(err)
     return {
       ok: false,
-      errorCode: c.errorCode,
-      safeMessage: c.safeMessage,
-      smtpResponse: c.smtpResponse,
+      ...buildSmtpFailureDetails('verify', err),
     }
   }
 }
@@ -100,13 +141,15 @@ export async function sendViaSmtp(payload: SendMailPayload): Promise<SendMailRes
     throw Object.assign(new Error('SMTP nicht konfiguriert'), { code: 'smtp_not_configured' })
   }
   const from = getMailFrom()
-  const info = await transport.sendMail({
-    from: `"${from.name}" <${from.address}>`,
-    to: payload.to,
-    subject: payload.subject,
-    html: payload.html,
-    text: payload.text,
-  })
+  const info = await withSmtpOperationTimeout('send', () =>
+    transport.sendMail({
+      from: `"${from.name}" <${from.address}>`,
+      to: payload.to,
+      subject: payload.subject,
+      html: payload.html,
+      text: payload.text,
+    }),
+  )
   const result = normalizeSendResult(info)
   if (result.rejected.length > 0) {
     throw Object.assign(new Error('Empfänger vom SMTP-Server abgelehnt'), {

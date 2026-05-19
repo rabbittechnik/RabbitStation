@@ -1,12 +1,16 @@
 import { buildSmtpTestHtml, SMTP_TEST_SUBJECT, SMTP_TEST_TEXT } from '../emails/smtpTestEmail.js'
-import { assertSmtpReadyToSend, classifySmtpError } from './smtpMailErrors.js'
+import { assertSmtpReadyToSend } from './smtpMailErrors.js'
 import {
+  buildSmtpFailureDetails,
   getSmtpConfigSnapshot,
   sendViaSmtp,
   verifyMailTransport,
   type SendMailResult,
-  type VerifyMailTransportResult,
+  type SmtpFailureDetails,
+  type SmtpOperationStep,
 } from './smtpMailTransport.js'
+
+export type { SmtpFailureDetails, SmtpOperationStep } from './smtpMailTransport.js'
 
 export type SendAdminTestMailInput = {
   to: string
@@ -19,20 +23,16 @@ export type SendAdminTestMailSuccess = {
   messageId?: string
   accepted: string[]
   rejected: string[]
-  verify?: VerifyMailTransportResult
+  smtpHost?: string
+  smtpPort?: number
+  secure?: boolean
   smtpResponse?: string
 }
 
 export type SendAdminTestMailFailure = {
   ok: false
   message: string
-  errorCode: string
-  smtpResponse?: string
-  hint?: string
-  verify?: VerifyMailTransportResult
-  accepted?: string[]
-  rejected?: string[]
-}
+} & Partial<SmtpFailureDetails>
 
 export type SendAdminTestMailResult = SendAdminTestMailSuccess | SendAdminTestMailFailure
 
@@ -44,6 +44,30 @@ export function normalizeTestRecipient(to: string): string | null {
   return t
 }
 
+function smtpConnectionMeta() {
+  const snap = getSmtpConfigSnapshot()
+  return {
+    smtpHost: snap.smtpHost,
+    smtpPort: snap.smtpPort,
+    secure: snap.smtpSecure,
+  }
+}
+
+function configFailure(precheck: ReturnType<typeof assertSmtpReadyToSend>): SendAdminTestMailFailure {
+  if (!precheck) {
+    return { ok: false, message: 'Interner Konfigurationsfehler' }
+  }
+  return {
+    ok: false,
+    message: 'Testmail konnte nicht gesendet werden',
+    errorCode: precheck.errorCode,
+    safeMessage: precheck.safeMessage,
+    smtpResponse: precheck.smtpResponse,
+    hint: precheck.hint,
+    ...smtpConnectionMeta(),
+  }
+}
+
 export async function sendAdminTestMail(input: SendAdminTestMailInput): Promise<SendAdminTestMailResult> {
   const to = normalizeTestRecipient(input.to)
   if (!to) {
@@ -51,32 +75,26 @@ export async function sendAdminTestMail(input: SendAdminTestMailInput): Promise<
       ok: false,
       message: 'Ungültige Empfänger-Adresse',
       errorCode: 'invalid_recipient',
+      safeMessage: 'Ungültige Empfänger-Adresse',
       hint: 'Bitte eine gültige E-Mail-Adresse im Feld "to" angeben.',
+      ...smtpConnectionMeta(),
     }
   }
 
   const precheck = assertSmtpReadyToSend()
   if (precheck) {
-    return {
-      ok: false,
-      message: 'Testmail konnte nicht gesendet werden',
-      errorCode: precheck.errorCode,
-      smtpResponse: precheck.smtpResponse,
-      hint: precheck.hint,
-    }
+    return configFailure(precheck)
   }
 
-  let verify: VerifyMailTransportResult | undefined
+  const meta = smtpConnectionMeta()
+
   if (input.verifyFirst !== false) {
-    verify = await verifyMailTransport()
+    const verify = await verifyMailTransport()
     if (!verify.ok) {
+      console.error(`[mail:test] verify fehlgeschlagen:`, verify.safeMessage)
       return {
-        ok: false,
         message: 'Testmail konnte nicht gesendet werden',
-        errorCode: verify.errorCode,
-        smtpResponse: verify.smtpResponse,
-        hint: 'SMTP-Verbindung oder Login fehlgeschlagen. Bitte SMTP_PASS / Gmail-App-Passwort prüfen.',
-        verify,
+        ...verify,
       }
     }
   }
@@ -97,19 +115,16 @@ export async function sendAdminTestMail(input: SendAdminTestMailInput): Promise<
       messageId: sendResult.messageId,
       accepted: sendResult.accepted,
       rejected: sendResult.rejected,
-      verify,
+      ...meta,
       smtpResponse: sendResult.response,
     }
   } catch (err) {
-    const classified = classifySmtpError(err)
-    console.error(`[mail:test] Fehler → ${to}:`, classified.safeMessage)
+    const details = buildSmtpFailureDetails('send', err)
+    console.error(`[mail:test] send fehlgeschlagen → ${to}:`, details.safeMessage)
     return {
       ok: false,
       message: 'Testmail konnte nicht gesendet werden',
-      errorCode: classified.errorCode,
-      smtpResponse: classified.smtpResponse,
-      hint: classified.hint,
-      verify,
+      ...details,
     }
   }
 }
@@ -122,5 +137,23 @@ export function buildWelcomeEmailAuditBase() {
     smtpPort: snap.smtpPort,
     smtpSecure: snap.smtpSecure,
     fromAddressMismatch: snap.fromAddressMismatch,
+  }
+}
+
+/** JSON-Felder für POST /api/admin/mail/test bei Fehlern (ohne Secrets). */
+export function mailTestFailureToJson(result: SendAdminTestMailFailure): Record<string, unknown> {
+  return {
+    ok: false,
+    message: result.message,
+    ...(result.step ? { step: result.step } : {}),
+    errorCode: result.errorCode,
+    safeMessage: result.safeMessage ?? result.message,
+    ...(result.responseCode != null ? { responseCode: result.responseCode } : {}),
+    ...(result.command ? { command: result.command } : {}),
+    ...(result.smtpHost ? { smtpHost: result.smtpHost } : {}),
+    ...(result.smtpPort != null ? { smtpPort: result.smtpPort } : {}),
+    ...(result.secure != null ? { secure: result.secure } : {}),
+    ...(result.smtpResponse ? { smtpResponse: result.smtpResponse } : {}),
+    ...(result.hint ? { hint: result.hint } : {}),
   }
 }

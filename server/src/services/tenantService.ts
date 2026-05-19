@@ -18,6 +18,10 @@ export type TenantRow = {
   blocked_reason: string | null
   setup_completed: number
   onboarding_tour_completed?: number
+  pro_trial_started_at?: string | null
+  pro_trial_used?: number
+  multi_trial_started_at?: string | null
+  multi_trial_used?: number
   contact_email: string | null
   contact_phone: string | null
   address_json: string | null

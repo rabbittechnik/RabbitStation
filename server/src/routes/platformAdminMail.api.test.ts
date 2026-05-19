@@ -48,11 +48,18 @@ describe('platform admin mail test API', () => {
       },
       body: JSON.stringify({ to: 'info.neonlink@gmail.com' }),
     })
-    const body = (await res.json()) as { ok: boolean; errorCode?: string; message?: string }
+    const body = (await res.json()) as {
+      ok: boolean
+      errorCode?: string
+      safeMessage?: string
+      message?: string
+    }
     assert.equal(res.status, 502)
     assert.equal(body.ok, false)
     assert.equal(body.errorCode, 'smtp_not_configured')
+    assert.ok(body.safeMessage)
     assert.match(body.message ?? '', /Testmail/)
+    assert.equal(res.headers.get('content-type')?.includes('json'), true)
   })
 
   it('POST /api/admin/mail/test rejects invalid recipient', async () => {

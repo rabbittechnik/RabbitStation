@@ -30,6 +30,7 @@ import { stationExtraHolidaysRouter } from './routes/stationExtraHolidays.routes
 import { stationHubRouter } from './routes/stationHub.routes.js'
 import { publicRouter } from './routes/public.routes.js'
 import { tenantRouter } from './routes/tenant.routes.js'
+import { subscriptionRouter } from './routes/subscription.routes.js'
 import { setupRouter } from './routes/setup.routes.js'
 import { platformAdminRouter } from './routes/platformAdmin.routes.js'
 import { supportPublicRouter } from './routes/support.routes.js'
@@ -75,6 +76,7 @@ export function createApp() {
 
   app.use('/api/auth', authRouter)
   app.use('/api/tenant', tenantRouter)
+  app.use('/api/subscription', subscriptionRouter)
   app.use('/api/setup', setupRouter)
   app.use('/api/admin', platformAdminRouter)
   app.use('/api/employee-access', employeeAccessRouter)

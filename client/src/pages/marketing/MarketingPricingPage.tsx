@@ -4,9 +4,11 @@ import {
   PRICING_FAQ,
   PRICING_PLANS,
   registerUrlForPlan,
+  type PlanId,
   type PricingPlan,
 } from '../../data/pricingPlans'
 import { GlowCard, PrimaryCta, SectionTitle } from './components/marketingUi'
+import { usePlanUpgrade } from '../../context/plan-upgrade-context'
 
 const HINTS = [
   '7 Tage kostenlos testen',
@@ -16,8 +18,27 @@ const HINTS = [
   'direkt im Browser nutzbar',
 ] as const
 
+const PLAN_RANK: Record<PlanId, number> = {
+  starter: 0,
+  pro: 1,
+  multi_station: 2,
+}
+
+function pricingCtaForLoggedIn(plan: PricingPlan, currentPlanId: PlanId | null): string {
+  if (currentPlanId === plan.id) return 'Aktueller Plan'
+  if (plan.id === 'multi_station') return 'Multi-Station testen'
+  if (plan.id === 'pro') return currentPlanId === 'starter' ? 'Pro 7 Tage testen' : 'Auf Pro wechseln'
+  return 'Starter testen'
+}
+
 function PricingCard({ plan }: { plan: PricingPlan }) {
   const highlighted = Boolean(plan.recommended)
+  const { isLoggedIn, currentPlanId, openPlanUpgrade } = usePlanUpgrade()
+  const isCurrent = isLoggedIn && currentPlanId === plan.id
+  const canUpgrade =
+    isLoggedIn && currentPlanId != null && PLAN_RANK[plan.id] > PLAN_RANK[currentPlanId]
+
+  const ctaLabel = isLoggedIn ? pricingCtaForLoggedIn(plan, currentPlanId) : plan.cta
 
   return (
     <GlowCard
@@ -33,14 +54,6 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
         </span>
       : null}
 
-      <PricingCardBody plan={plan} highlighted={highlighted} />
-    </GlowCard>
-  )
-}
-
-function PricingCardBody({ plan, highlighted }: { plan: PricingPlan; highlighted: boolean }) {
-  return (
-    <>
       <div className="mb-6 pt-2">
         <h3 className="text-xl font-bold text-white">{plan.name}</h3>
         <p className="mt-2 text-sm text-[#94a3b8]">{plan.subtitle}</p>
@@ -54,9 +67,7 @@ function PricingCardBody({ plan, highlighted }: { plan: PricingPlan; highlighted
         {plan.features.map((f) => (
           <li
             key={f.text}
-            className={`flex items-start gap-2.5 text-sm ${
-              f.included ? 'text-[#cbd5e1]' : 'text-[#64748b]'
-            }`}
+            className={`flex items-start gap-2.5 text-sm ${f.included ? 'text-[#cbd5e1]' : 'text-[#64748b]'}`}
           >
             {f.included ?
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" strokeWidth={2.5} />
@@ -64,26 +75,40 @@ function PricingCardBody({ plan, highlighted }: { plan: PricingPlan; highlighted
             <span className={f.included ? '' : 'line-through decoration-[#475569]/80'}>
               {f.text}
               {!f.included ?
-                <span className="ml-1 text-xs font-normal text-[#64748b] no-underline">
-                  (nicht enthalten)
-                </span>
+                <span className="ml-1 text-xs font-normal text-[#64748b] no-underline">(nicht enthalten)</span>
               : null}
             </span>
           </li>
         ))}
       </ul>
 
-      {plan.footnote ?
-        <p className="mb-4 text-xs text-[#94a3b8]">{plan.footnote}</p>
-      : null}
+      {plan.footnote ? <p className="mb-4 text-xs text-[#94a3b8]">{plan.footnote}</p> : null}
 
-      <PrimaryCta
-        to={registerUrlForPlan(plan.id)}
-        className={`w-full ${highlighted ? '' : '!from-cyan-500/90 !to-cyan-600/90'}`}
-      >
-        {plan.cta}
-      </PrimaryCta>
-    </>
+      {isLoggedIn ?
+        <button
+          type="button"
+          disabled={isCurrent}
+          onClick={() => {
+            if (!isCurrent && canUpgrade) openPlanUpgrade(plan.id)
+          }}
+          className={`w-full rounded-xl px-4 py-3 text-center text-sm font-semibold transition ${
+            isCurrent ?
+              'cursor-default border border-white/15 bg-white/5 text-[#94a3b8]'
+            : canUpgrade ?
+              'bg-gradient-to-r from-cyan-400 to-cyan-500 text-[#03121f] hover:from-cyan-300 hover:to-cyan-400'
+            : 'cursor-default border border-white/15 bg-white/5 text-[#64748b]'
+          } ${highlighted && canUpgrade ? 'shadow-[0_0_24px_rgba(34,211,238,0.35)]' : ''}`}
+        >
+          {ctaLabel}
+        </button>
+      : <PrimaryCta
+          to={registerUrlForPlan(plan.id)}
+          className={`w-full ${highlighted ? '' : '!from-cyan-500/90 !to-cyan-600/90'}`}
+        >
+          {plan.cta}
+        </PrimaryCta>
+      }
+    </GlowCard>
   )
 }
 
@@ -108,9 +133,7 @@ function FaqItem({
         {q}
         <span className="shrink-0 text-cyan-400">{open ? '−' : '+'}</span>
       </button>
-      {open ?
-        <p className="pb-4 text-sm leading-relaxed text-[#94a3b8]">{a}</p>
-      : null}
+      {open ? <p className="pb-4 text-sm leading-relaxed text-[#94a3b8]">{a}</p> : null}
     </div>
   )
 }
@@ -174,3 +197,4 @@ export function MarketingPricingPage() {
     </div>
   )
 }
+

@@ -12,6 +12,7 @@ type NodemailerLikeError = {
   message?: string
   response?: string
   responseCode?: number
+  command?: string
 }
 
 function trimResponse(raw?: string): string | undefined {

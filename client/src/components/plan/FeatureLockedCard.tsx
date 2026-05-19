@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
-import { Crown, Lock } from 'lucide-react'
+import { Lock, Crown } from 'lucide-react'
 import type { FeatureKey } from '../../data/planFeatures'
+import { FEATURE_MIN_PLAN } from '../../data/planFeatures'
 import { getPlanFeatureCopy } from '../../data/planFeatureCopy'
+import { usePlanUpgrade } from '../../context/plan-upgrade-context'
 
 type FeatureLockedCardProps = {
   feature: FeatureKey
@@ -9,6 +10,17 @@ type FeatureLockedCardProps = {
   compact?: boolean
   onDismiss?: () => void
   className?: string
+}
+
+function upgradeCtaLabel(feature: FeatureKey, isLoggedIn: boolean): string {
+  const min = FEATURE_MIN_PLAN[feature]
+  if (!isLoggedIn) {
+    if (min === 'multi_station') return 'Multi-Station testen'
+    if (min === 'pro') return 'Pro 7 Tage testen'
+    return 'Starter testen'
+  }
+  if (min === 'multi_station') return 'Multi-Station testen'
+  return 'Pro 7 Tage testen'
 }
 
 export function FeatureLockedCard({
@@ -19,6 +31,8 @@ export function FeatureLockedCard({
   className = '',
 }: FeatureLockedCardProps) {
   const copy = getPlanFeatureCopy(feature)
+  const { isLoggedIn, openPlanUpgrade } = usePlanUpgrade()
+  const targetPlan = FEATURE_MIN_PLAN[feature]
 
   return (
     <div
@@ -38,17 +52,18 @@ export function FeatureLockedCard({
           </p>
           <h3 className={`font-semibold text-cyan-50 ${compact ? 'text-sm' : 'text-base'}`}>{copy.title}</h3>
           {!compact ? <p className="mt-2 text-sm leading-relaxed text-[#a8b8d8]">{copy.description}</p> : null}
-          {currentPlan ? (
+          {currentPlan ?
             <p className="mt-2 text-xs text-[var(--text-faint)]">Aktueller Plan: {currentPlan}</p>
-          ) : null}
+          : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              to="/preise"
+            <button
+              type="button"
+              onClick={() => openPlanUpgrade(targetPlan)}
               className="inline-flex items-center rounded-lg bg-cyan-500 px-3 py-1.5 text-sm font-medium text-[#060b14] hover:bg-cyan-400"
             >
-              {copy.requiredPlanLabel}-Paket ansehen
-            </Link>
-            {onDismiss ? (
+              {upgradeCtaLabel(feature, isLoggedIn)}
+            </button>
+            {onDismiss ?
               <button
                 type="button"
                 onClick={onDismiss}
@@ -56,15 +71,14 @@ export function FeatureLockedCard({
               >
                 Später
               </button>
-            ) : (
-              <button
+            : <button
                 type="button"
                 onClick={() => window.history.back()}
                 className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/5"
               >
                 Zurück
               </button>
-            )}
+            }
           </div>
         </div>
       </div>

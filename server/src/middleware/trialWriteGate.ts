@@ -14,6 +14,7 @@ const WRITE_EXEMPT_PREFIXES = [
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
   '/api/tenant/subscription',
+  '/api/subscription',
   '/api/setup',
   '/api/admin',
 ]

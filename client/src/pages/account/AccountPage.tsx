@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { usePlanUpgrade } from '../../context/plan-upgrade-context'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
@@ -24,6 +25,7 @@ function subscriptionStatusLabel(status?: string): string {
 
 export function AccountPage() {
   const { user, refreshMe } = useAuth()
+  const { openPlanUpgrade, currentPlanId } = usePlanUpgrade()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -124,12 +126,21 @@ export function AccountPage() {
             </div>
           ) : null}
         </dl>
-        <Link
-          to="/preise"
-          className="inline-flex rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/20"
-        >
-          Paket ansehen / Upgrade
-        </Link>
+        {currentPlanId === 'pro' || currentPlanId === 'multi_station' ?
+          <Link
+            to="/preise"
+            className="inline-flex rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/20"
+          >
+            Paket ansehen
+          </Link>
+        : <button
+            type="button"
+            onClick={() => openPlanUpgrade('pro')}
+            className="inline-flex rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/20"
+          >
+            Pro 7 Tage testen
+          </button>
+        }
       </Card>
 
       <Card padding="md" className="border-[var(--border-subtle)] space-y-3">
