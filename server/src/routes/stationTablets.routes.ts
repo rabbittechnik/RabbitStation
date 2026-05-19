@@ -12,7 +12,9 @@ import {
   updateStationTablet,
 } from '../services/stationTabletDeviceService.js'
 import { createPairingCode } from '../services/tabletPairingService.js'
-import { getUserTenantContext } from '../services/tenantService.js'
+import { getUserTenantContext, getTenantById } from '../services/tenantService.js'
+import { canAddTablet } from '../services/planFeatureService.js'
+import { handlePlanError } from '../middleware/planFeatureGate.js'
 
 export const stationTabletsRouter = Router()
 
@@ -52,9 +54,16 @@ stationTabletsRouter.post('/', (req, res) => {
     const body = (req.body ?? {}) as { stationId?: string; name?: string; description?: string }
     const stationId = typeof body.stationId === 'string' ? body.stationId.trim() : ''
     if (!requireAnyPermission(req, res, stationId, [...MANAGE_KEYS])) return
+    const db = getDb()
+    const tctx = req.adminUser ? getUserTenantContext(db, req.adminUser.sub) : null
+    const tenant = tctx?.tenantId ? getTenantById(db, tctx.tenantId) : undefined
+    if (tenant) {
+      const check = canAddTablet(db, tenant)
+      if (!check.ok) return handlePlanError(res, check.error)
+    }
     const ctx = getAccess(req)
     const createdBy = ctx?.userId ? `user:${ctx.userId}` : 'admin'
-    const { device, tabletToken } = createStationTablet(getDb(), {
+    const { device, tabletToken } = createStationTablet(db, {
       stationId,
       name: String(body.name ?? ''),
       description: body.description,
@@ -62,6 +71,7 @@ stationTabletsRouter.post('/', (req, res) => {
     })
     jsonOk(res, { device, tabletToken })
   } catch (e) {
+    if (handlePlanError(res, e)) return
     jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
   }
 })

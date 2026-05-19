@@ -10,6 +10,7 @@ import { nowIso } from '../utils/timestamps.js'
 import { appendUserAudit } from './userAuditLogService.js'
 import { getUserTenantContext, getTenantById, tenantToApi } from './tenantService.js'
 import { getSubscriptionWriteState, getTrialMessage } from './subscriptionService.js'
+import { buildTenantPlanEntitlements } from './planFeatureService.js'
 import { appendTenantAudit } from './tenantAuditService.js'
 
 export type AuthUserRow = {
@@ -150,6 +151,7 @@ export function buildAuthMeUser(db: Database, userId: string) {
         message: string | null
       }
     | undefined
+  let planEntitlements: ReturnType<typeof buildTenantPlanEntitlements> | undefined
   if (tenantCtx?.tenantId) {
     const t = getTenantById(db, tenantCtx.tenantId)
     if (t) {
@@ -159,8 +161,9 @@ export function buildAuthMeUser(db: Database, userId: string) {
         canWrite: ws.canWrite,
         status: ws.status,
         trialDaysLeft: ws.trialDaysLeft,
-        message: getTrialMessage(ws),
+        message: getTrialMessage(ws, t),
       }
+      planEntitlements = buildTenantPlanEntitlements(db, t)
     }
   }
   return {
@@ -177,6 +180,7 @@ export function buildAuthMeUser(db: Database, userId: string) {
     tenantId: tenantCtx?.tenantId ?? undefined,
     tenant,
     subscription,
+    planEntitlements,
     setupRequired: tenant ? !tenant.setupCompleted : false,
     setupCompleted: tenant?.setupCompleted ?? true,
     onboardingTourCompleted: tenant?.onboardingTourCompleted ?? true,

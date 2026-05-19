@@ -11,7 +11,6 @@ import { QuickActions } from './QuickActions'
 import { WeeklySchedule } from './WeeklySchedule'
 import { WelcomeBanner } from './WelcomeBanner'
 import { TuvReportDashboardReminder } from '../../components/tuv/TuvReportDashboardReminder'
-import { TrialBanner } from '../../components/saas/TrialBanner'
 
 const dashboardCardGrid =
   'grid min-w-0 gap-3 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]'
@@ -19,7 +18,6 @@ const dashboardCardGrid =
 export function DashboardPage() {
   return (
     <div className="min-w-0 w-full max-w-full space-y-3 overflow-x-hidden pb-6">
-      <TrialBanner />
       <TuvReportDashboardReminder />
 
       <section

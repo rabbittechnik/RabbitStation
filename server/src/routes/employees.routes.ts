@@ -12,6 +12,9 @@ import {
 } from '../services/employeeAppDeviceService.js'
 import { listActiveShiftWarningsForEmployee, acknowledgeShiftWarningByAdmin } from '../services/employeeShiftWarningService.js'
 import { employeePayrollDocumentsRouter } from './employeePayrollDocuments.routes.js'
+import { getUserTenantContext, getTenantById } from '../services/tenantService.js'
+import { canAddEmployee } from '../services/planFeatureService.js'
+import { handlePlanError } from '../middleware/planFeatureGate.js'
 
 export const employeesRouter = Router()
 
@@ -70,9 +73,17 @@ employeesRouter.post('/', (req, res) => {
   try {
     const stationId = typeof req.query.stationId === 'string' ? req.query.stationId : undefined
     if (!requirePermission(req, res, stationId, 'employees.create')) return
+    const db = getDb()
+    const tctx = req.adminUser ? getUserTenantContext(db, req.adminUser.sub) : null
+    const tenant = tctx?.tenantId ? getTenantById(db, tctx.tenantId) : undefined
+    if (tenant) {
+      const check = canAddEmployee(db, tenant)
+      if (!check.ok) return handlePlanError(res, check.error)
+    }
     const sens = canViewEmployeeSensitive(req, stationId!)
-    jsonOk(res, employeeService.createEmployee(getDb(), req.body ?? {}, stationId!, { allowSensitive: sens }), 201)
+    jsonOk(res, employeeService.createEmployee(db, req.body ?? {}, stationId!, { allowSensitive: sens }), 201)
   } catch (e) {
+    if (handlePlanError(res, e)) return
     jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
   }
 })

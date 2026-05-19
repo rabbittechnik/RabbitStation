@@ -6,6 +6,7 @@ import { tenantToApi } from '../services/tenantService.js'
 import { nowIso } from '../utils/timestamps.js'
 import { appendTenantAudit } from '../services/tenantAuditService.js'
 import { buildAdminHealthPayload } from '../services/adminHealthService.js'
+import { normalizePlanId } from '../constants/plans.js'
 
 export const platformAdminRouter = Router()
 platformAdminRouter.use(requirePlatformAdmin)
@@ -92,23 +93,54 @@ platformAdminRouter.get('/backups/status', (_req, res) => {
 
 platformAdminRouter.patch('/tenants/:tenantId/subscription', (req, res) => {
   const tenantId = String(req.params.tenantId ?? '')
-  const body = req.body as { subscriptionStatus?: string; trialEnd?: string; blockedReason?: string | null }
+  const body = req.body as {
+    plan?: string
+    subscriptionStatus?: string
+    subscription_status?: string
+    trialEnd?: string
+    trial_end?: string
+    currentPeriodStart?: string
+    current_period_start?: string
+    currentPeriodEnd?: string
+    current_period_end?: string
+    blockedReason?: string | null
+    blocked_reason?: string | null
+  }
   const ts = nowIso()
   const db = getDb()
-  db.prepare(
-    `UPDATE tenants SET
-      subscription_status = COALESCE(?, subscription_status),
-      trial_end = COALESCE(?, trial_end),
-      blocked_reason = ?,
-      updated_at = ?
-    WHERE id = ?`,
-  ).run(
-    body.subscriptionStatus ?? null,
-    body.trialEnd ?? null,
-    body.blockedReason ?? null,
-    ts,
-    tenantId,
-  )
+  const sets = ['updated_at = ?']
+  const params: unknown[] = [ts]
+  if (body.plan != null) {
+    sets.push('plan = ?')
+    params.push(normalizePlanId(String(body.plan)))
+  }
+  const subStatus = body.subscriptionStatus ?? body.subscription_status
+  if (subStatus != null) {
+    sets.push('subscription_status = ?')
+    params.push(subStatus)
+  }
+  const trialEnd = body.trialEnd ?? body.trial_end
+  if (trialEnd != null) {
+    sets.push('trial_end = ?')
+    params.push(trialEnd)
+  }
+  const periodStart = body.currentPeriodStart ?? body.current_period_start
+  if (periodStart != null) {
+    sets.push('current_period_start = ?')
+    params.push(periodStart)
+  }
+  const periodEnd = body.currentPeriodEnd ?? body.current_period_end
+  if (periodEnd != null) {
+    sets.push('current_period_end = ?')
+    params.push(periodEnd)
+  }
+  const blocked = body.blockedReason !== undefined ? body.blockedReason : body.blocked_reason
+  if (blocked !== undefined) {
+    sets.push('blocked_reason = ?')
+    params.push(blocked)
+  }
+  params.push(tenantId)
+  db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?`).run(...params)
   appendTenantAudit(db, {
     tenantId,
     userId: req.adminUser?.sub,

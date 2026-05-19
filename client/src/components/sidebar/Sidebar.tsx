@@ -6,6 +6,8 @@ import { navEntries, type NavEntry, type NavGroup } from './navConfig'
 import { useAuth } from '../../context/auth-context'
 import { useStation } from '../../context/station-context'
 import { canAccessTimeApprovalsPage, canApproveTimeEntries } from '../../utils/timeApproval'
+import { featureForPath } from '../../data/planFeatures'
+import { usePlanEntitlements } from '../../hooks/usePlanEntitlements'
 
 function pathMatches(pathname: string, to: string) {
   if (to === '/dashboard') return pathname === '/dashboard' || pathname === '/'
@@ -180,6 +182,7 @@ export function Sidebar() {
   const { hasPermission } = useStation()
   const canSeeTimeApprovals = canAccessTimeApprovalsPage(user)
   const canApprove = canApproveTimeEntries(user)
+  const { hasFeature: hasPlanFeature } = usePlanEntitlements()
   const visibleNav = useMemo(() => {
     return navEntries
       .filter((e) => {
@@ -207,12 +210,14 @@ export function Sidebar() {
               const ok = c.anyPermission.some((k) => hasPermission(k))
               if (!ok) return false
             }
+            const feat = featureForPath(c.to)
+            if (feat && !hasPlanFeature(feat)) return false
             return true
           }),
         }
       })
       .filter((e) => (e.type === 'group' ? e.children.length > 0 : true))
-  }, [canApprove, user?.globalAdmin, hasPermission])
+  }, [canApprove, canSeeTimeApprovals, hasPermission, hasPlanFeature, user?.globalAdmin, user?.stationAccess])
 
   const defaultOpen = useMemo(() => {
     const ids = new Set<string>()

@@ -213,6 +213,10 @@ export function createStation(db: Database, body: Record<string, unknown>) {
       ts,
     )
   }
+  const tenantId = body.tenantId != null ? String(body.tenantId).trim() : ''
+  if (tenantId && cols.has('tenant_id')) {
+    db.prepare(`UPDATE stations SET tenant_id = ? WHERE id = ?`).run(tenantId, id)
+  }
   seedStationShiftCloseChecklistDefsFromBuiltInCatalog(db, id)
   return getStation(db, id)
 }

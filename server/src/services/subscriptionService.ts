@@ -1,4 +1,5 @@
 import type { Database } from 'better-sqlite3'
+import { planDisplayName } from '../constants/plans.js'
 import { getTenantById, type TenantRow } from './tenantService.js'
 
 export type SubscriptionWriteState = {
@@ -57,15 +58,31 @@ export function assertTenantCanWrite(db: Database, tenantId: string): void {
   }
 }
 
-export function getTrialMessage(state: SubscriptionWriteState): string | null {
-  if (state.status !== 'trial' && state.status !== 'expired') return null
+export function getTrialMessage(
+  state: SubscriptionWriteState,
+  tenant?: TenantRow | null,
+): string | null {
+  const planLabel = tenant ? planDisplayName(tenant.plan) : 'RabbitStation Pro'
+
+  if (state.status === 'active') {
+    return `Plan: ${planLabel} aktiv`
+  }
+
+  if (state.status !== 'trial' && state.status !== 'expired') {
+    if (!state.canWrite) return 'Testphase abgelaufen – Plan aktivieren'
+    return null
+  }
+
   if (state.trialDaysLeft == null) return null
-  if (state.trialDaysLeft > 1) return `Deine Testphase läuft noch ${state.trialDaysLeft} Tage.`
-  if (state.trialDaysLeft === 1) return 'Deine Testphase endet morgen.'
+
+  if (state.trialDaysLeft > 1) {
+    return `Testphase: ${planLabel} – noch ${state.trialDaysLeft} Tage`
+  }
+  if (state.trialDaysLeft === 1) return `Testphase: ${planLabel} – endet morgen`
   if (state.trialDaysLeft === 0) {
     return state.canWrite
-      ? 'Deine Testphase endet heute.'
-      : 'Deine Testphase ist abgelaufen. Bitte wähle ein Abo, um RabbitStation Pro weiter zu nutzen.'
+      ? `Testphase: ${planLabel} – endet heute`
+      : 'Testphase abgelaufen – Plan aktivieren'
   }
-  return 'Deine Testphase ist abgelaufen. Bitte wähle ein Abo, um RabbitStation Pro weiter zu nutzen.'
+  return 'Testphase abgelaufen – Plan aktivieren'
 }

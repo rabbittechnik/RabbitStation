@@ -69,10 +69,20 @@ export type AuthUser = {
   }
   tenant?: {
     companyName: string
+    plan?: string
     subscriptionStatus: string
     trialDaysLeft: number | null
     setupCompleted: boolean
     onboardingTourCompleted?: boolean
+  }
+  planEntitlements?: {
+    planId: string
+    planName: string
+    priceMonthly: number
+    features: string[]
+    limits: { maxStations: number; maxEmployees: number; maxTablets: number }
+    usage: { stations: number; employees: number; tablets: number }
+    subscriptionStatus: string
   }
 }
 

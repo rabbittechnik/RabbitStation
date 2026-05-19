@@ -17,7 +17,9 @@ import {
   hasPermission,
 } from '../services/stationAccessService.js'
 import type { AccessContext } from '../services/stationAccessService.js'
-import { getUserTenantContext } from '../services/tenantService.js'
+import { getUserTenantContext, getTenantById } from '../services/tenantService.js'
+import { canAddStation } from '../services/planFeatureService.js'
+import { handlePlanError } from '../middleware/planFeatureGate.js'
 import { listShiftTemplates } from '../services/shiftTemplateService.js'
 
 export const stationsRouter = Router()
@@ -209,8 +211,18 @@ stationsRouter.post('/', (req, res) => {
   try {
     const ctx = req.accessContext
     if (!ctx || !canMutateStationDirectory(ctx)) return jsonErr(res, 'Keine Berechtigung', 403)
-    jsonOk(res, stationService.createStation(getDb(), req.body ?? {}), 201)
+    const db = getDb()
+    const tctx = req.adminUser ? getUserTenantContext(db, req.adminUser.sub) : null
+    const tenant = tctx?.tenantId ? getTenantById(db, tctx.tenantId) : undefined
+    if (tenant) {
+      const check = canAddStation(db, tenant)
+      if (!check.ok) return handlePlanError(res, check.error)
+    }
+    const body = { ...(req.body as Record<string, unknown>) }
+    if (tenant && tctx?.tenantId) body.tenantId = tctx.tenantId
+    jsonOk(res, stationService.createStation(db, body), 201)
   } catch (e) {
+    if (handlePlanError(res, e)) return
     jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
   }
 })

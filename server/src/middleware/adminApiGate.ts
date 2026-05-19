@@ -3,6 +3,7 @@ import { verifyAdminToken } from '../services/authService.js'
 import { getDb } from '../db/database.js'
 import { buildAccessContext } from '../services/stationAccessService.js'
 import { trialWriteGate } from './trialWriteGate.js'
+import { planFeatureGate } from './planFeatureGate.js'
 import { isControlCenterApiRequest } from './controlCenterApiAuth.js'
 import { jsonErrAdmin } from '../utils/http.js'
 
@@ -56,5 +57,7 @@ export function adminApiGate(req: Request, res: Response, next: NextFunction) {
   }
   req.accessContext = buildAccessContext(getDb(), payload.sub)
   req.adminUser = payload
-  trialWriteGate(req, res, next)
+  planFeatureGate(req, res, () => {
+    trialWriteGate(req, res, next)
+  })
 }

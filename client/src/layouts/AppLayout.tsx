@@ -4,6 +4,7 @@ import { AppFooter } from '../components/layout/AppFooter'
 import { Sidebar } from '../components/sidebar/Sidebar'
 import { Topbar } from '../components/topbar/Topbar'
 import { SetupIncompleteBanner } from '../components/onboarding/SetupIncompleteBanner'
+import { PlanStatusBanner } from '../components/saas/PlanStatusBanner'
 import { OnboardingTour } from '../components/onboarding/OnboardingTour'
 import { useAuth } from '../context/auth-context'
 
@@ -44,6 +45,7 @@ export function AppLayout() {
         <Topbar />
         <main className="flex-1 overflow-auto px-4 py-5 md:px-6 lg:px-8" data-tour="dashboard">
           <SetupIncompleteBanner />
+          <PlanStatusBanner />
           <Outlet />
         </main>
         <OnboardingTour
