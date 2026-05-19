@@ -7,6 +7,7 @@ import {
   getDocumentTemplateByKey,
   type DocumentTemplateKey,
 } from '../data/documentTemplateCatalog.js'
+import { getStationDocumentsDir, getDocumentsDir } from '../config/dataPaths.js'
 import { nowIso } from '../utils/timestamps.js'
 
 export type StationDocumentRow = {
@@ -33,14 +34,9 @@ export type StationDocumentRow = {
   version_label: string | null
 }
 
-/** Stations-Uploads (cwd = server/ auf Railway, Repo-Root lokal). */
+/** Stations-Uploads unter DOCUMENTS_DIR/station-documents (Production: /data/documents/...). */
 export function documentsRootDir(): string {
-  const fromEnv = process.env.STATION_DOCUMENTS_DIR?.trim()
-  if (fromEnv) return path.isAbsolute(fromEnv) ? fromEnv : path.join(process.cwd(), fromEnv)
-  const direct = path.join(process.cwd(), 'data', 'station-documents')
-  const nested = path.join(process.cwd(), 'server', 'data', 'station-documents')
-  if (fs.existsSync(direct) || !fs.existsSync(nested)) return direct
-  return nested
+  return getStationDocumentsDir()
 }
 
 /** PDF-Vorlagen aus dem Repo (server/data/document-templates). */
@@ -57,6 +53,7 @@ function allowedDocumentRoots(): string[] {
   const roots = new Set<string>()
   for (const r of [
     path.resolve(documentsRootDir()),
+    path.resolve(getDocumentsDir()),
     path.resolve(process.cwd(), 'data', 'station-documents'),
     path.resolve(process.cwd(), 'server', 'data', 'station-documents'),
   ]) {

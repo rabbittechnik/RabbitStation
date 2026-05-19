@@ -8,6 +8,8 @@ import {
   type RegistrationWelcomeEmailVars,
 } from '../emails/registrationWelcomeEmail.js'
 import { appendTenantAudit } from './tenantAuditService.js'
+import { buildWelcomeEmailAuditBase } from './mailTestService.js'
+import { assertSmtpReadyToSend, classifySmtpError } from './smtpMailErrors.js'
 import { isSmtpConfigured, sendViaSmtp } from './smtpMailTransport.js'
 
 export type SendRegistrationWelcomeEmailInput = {
@@ -28,6 +30,7 @@ export type SendRegistrationWelcomeEmailResult = {
   sent: boolean
   stubbed: boolean
   error?: string
+  errorCode?: string
 }
 
 function buildUrls(setupUrl: string, loginUrl?: string): Pick<RegistrationWelcomeEmailVars, 'setupUrl' | 'loginUrl'> {
@@ -65,13 +68,7 @@ export async function sendRegistrationWelcomeEmail(
   input: SendRegistrationWelcomeEmailInput,
 ): Promise<SendRegistrationWelcomeEmailResult> {
   const to = input.to.trim().toLowerCase()
-  if (!to) {
-    console.warn('[mail:registration-welcome] Keine Empfänger-E-Mail – Versand übersprungen')
-    return { sent: false, stubbed: true, error: 'missing_recipient' }
-  }
-
-  const { subject, html, text } = buildRegistrationWelcomeContent(input)
-  const isDev = process.env.NODE_ENV !== 'production'
+  const auditBase = buildWelcomeEmailAuditBase()
 
   const audit = (action: string, metadata?: Record<string, unknown>) => {
     if (!input.db) return
@@ -81,10 +78,22 @@ export async function sendRegistrationWelcomeEmail(
       action,
       entityType: 'user',
       entityId: input.userId,
-      metadata: { to, ...metadata },
+      metadata: { recipientEmail: to, ...auditBase, ...metadata },
       req: input.req,
     })
   }
+
+  if (!to) {
+    console.warn('[mail:registration-welcome] Keine Empfänger-E-Mail – Versand übersprungen')
+    audit('registration_welcome_email_failed', {
+      errorCode: 'missing_recipient',
+      safeMessage: 'Keine Empfänger-E-Mail angegeben.',
+    })
+    return { sent: false, stubbed: true, error: 'missing_recipient', errorCode: 'missing_recipient' }
+  }
+
+  const { subject, html, text } = buildRegistrationWelcomeContent(input)
+  const isDev = process.env.NODE_ENV !== 'production'
 
   if (!isSmtpConfigured()) {
     const msg = '[mail:registration-welcome] SMTP_HOST nicht gesetzt – Versand nur Stub/Log'
@@ -93,19 +102,54 @@ export async function sendRegistrationWelcomeEmail(
     } else {
       console.warn(msg)
     }
-    audit('registration_welcome_email_failed', { reason: 'smtp_not_configured', stubbed: true })
-    return { sent: false, stubbed: true, error: 'smtp_not_configured' }
+    audit('registration_welcome_email_failed', {
+      errorCode: 'smtp_not_configured',
+      safeMessage: 'SMTP ist nicht konfiguriert (SMTP_HOST fehlt).',
+      stubbed: true,
+    })
+    return { sent: false, stubbed: true, error: 'smtp_not_configured', errorCode: 'smtp_not_configured' }
+  }
+
+  const precheck = assertSmtpReadyToSend()
+  if (precheck) {
+    console.warn(`[mail:registration-welcome] ${precheck.safeMessage} → ${to}`)
+    audit('registration_welcome_email_failed', {
+      errorCode: precheck.errorCode,
+      safeMessage: precheck.safeMessage,
+      smtpResponse: precheck.smtpResponse,
+      accepted: [],
+      rejected: [],
+    })
+    return { sent: false, stubbed: false, error: precheck.safeMessage, errorCode: precheck.errorCode }
   }
 
   try {
-    await sendViaSmtp({ to, subject, html, text })
-    console.info(`[mail:registration-welcome] Gesendet → ${to}`)
-    audit('registration_welcome_email_sent', { subject })
+    const sendResult = await sendViaSmtp({ to, subject, html, text })
+    console.info(
+      `[mail:registration-welcome] Gesendet → ${to} messageId=${sendResult.messageId ?? '—'} accepted=${sendResult.accepted.join(',')}`,
+    )
+    audit('registration_welcome_email_sent', {
+      messageId: sendResult.messageId,
+      accepted: sendResult.accepted,
+      rejected: sendResult.rejected,
+      smtpResponse: sendResult.response,
+    })
     return { sent: true, stubbed: false }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error(`[mail:registration-welcome] Fehler → ${to}:`, message)
-    audit('registration_welcome_email_failed', { reason: message })
-    return { sent: false, stubbed: false, error: message }
+    const classified = classifySmtpError(err)
+    console.error(`[mail:registration-welcome] Fehler → ${to}:`, classified.safeMessage)
+    audit('registration_welcome_email_failed', {
+      errorCode: classified.errorCode,
+      safeMessage: classified.safeMessage,
+      smtpResponse: classified.smtpResponse,
+      accepted: [],
+      rejected: [],
+    })
+    return {
+      sent: false,
+      stubbed: false,
+      error: classified.safeMessage,
+      errorCode: classified.errorCode,
+    }
   }
 }

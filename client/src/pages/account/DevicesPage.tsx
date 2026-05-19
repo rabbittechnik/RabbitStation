@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { StationTabletsPanel } from './StationTabletsPanel'
 import { PwaInstallPanel } from '../../components/pwa/PwaInstallPanel'
+import { PlanFeatureGate } from '../../components/plan/PlanFeatureGate'
 
 type DeviceRow = {
   id: string
@@ -345,18 +346,20 @@ export function DevicesPage() {
       ) : null}
 
       {canViewStationTablets ? (
-        <div className="border-t border-[var(--border-subtle)] pt-8 mt-8 space-y-4">
-          <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]/80 p-4 text-sm text-[var(--text-muted)]">
-            <h3 className="text-base font-semibold text-[var(--text-main)]">Dynamische Wochenend-Aufgaben</h3>
-            <p className="mt-2">
-              Vorbereitet für spätere Konfiguration pro Station. Aktuell (Standard): Zusatzaufgaben für Samstag/Sonntag
-              werden nach Veröffentlichen des Schichtplans erzeugt; pro Wochenend-Schicht zwei dynamische Aufgaben plus
-              die Pflichten „Außenbereich kontrollieren“ und „Mülleimer kontrollieren“; „Fenster putzen“ höchstens drei
-              automatische Zuweisungen pro Kalenderjahr (gesteuert über erledigte Einträge).
-            </p>
-          </section>
-          <StationTabletsPanel canView={canViewStationTablets} canManage={canManageStationTablets} />
-        </div>
+        <PlanFeatureGate feature="station_tablet">
+          <div className="border-t border-[var(--border-subtle)] pt-8 mt-8 space-y-4">
+            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]/80 p-4 text-sm text-[var(--text-muted)]">
+              <h3 className="text-base font-semibold text-[var(--text-main)]">Dynamische Wochenend-Aufgaben</h3>
+              <p className="mt-2">
+                Vorbereitet für spätere Konfiguration pro Station. Aktuell (Standard): Zusatzaufgaben für Samstag/Sonntag
+                werden nach Veröffentlichen des Schichtplans erzeugt; pro Wochenend-Schicht zwei dynamische Aufgaben plus
+                die Pflichten „Außenbereich kontrollieren“ und „Mülleimer kontrollieren“; „Fenster putzen“ höchstens drei
+                automatische Zuweisungen pro Kalenderjahr (gesteuert über erledigte Einträge).
+              </p>
+            </section>
+            <StationTabletsPanel canView={canViewStationTablets} canManage={canManageStationTablets} />
+          </div>
+        </PlanFeatureGate>
       ) : null}
 
       {detail ? (

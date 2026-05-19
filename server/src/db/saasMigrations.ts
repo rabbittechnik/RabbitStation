@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { nowIso } from '../utils/timestamps.js'
+import { isDemoSeedEnabled } from '../config/dataPaths.js'
 import { DEMO_STATION_ID } from '../constants/demo.js'
 import { ensureSupportSessionsTable } from './supportSessionMigrations.js'
 
@@ -117,8 +118,10 @@ export function runSaasMigrations(db: Database.Database) {
   addCol(db, 'stations', 'tenant_id', 'tenant_id TEXT')
 
   ensureSaasRoles(db)
-  ensureDemoTenant(db)
-  backfillTenantIds(db)
+  if (isDemoSeedEnabled()) {
+    ensureDemoTenant(db)
+    backfillTenantIds(db)
+  }
 }
 
 function ensureSaasRoles(db: Database.Database) {

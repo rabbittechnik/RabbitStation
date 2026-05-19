@@ -72,6 +72,7 @@ export const FEATURE_LABELS: Partial<Record<FeatureKey, string>> = {
 export const NAV_PATH_FEATURES: Record<string, FeatureKey> = {
   '/absences': 'absences',
   '/abwesenheiten': 'absences',
+  '/vacation-blocks': 'absences',
   '/tuv-berichte': 'monthly_tuv_report',
   '/organisation/representatives': 'contacts',
   '/contacts/representatives': 'contacts',
@@ -82,6 +83,7 @@ export const NAV_PATH_FEATURES: Record<string, FeatureKey> = {
   '/zeiterfassung/freigaben': 'time_approvals',
   '/time-tracking/approvals': 'time_approvals',
   '/holidays': 'holidays',
+  '/account/devices': 'station_tablet',
 }
 
 export function featureForPath(path: string): FeatureKey | undefined {

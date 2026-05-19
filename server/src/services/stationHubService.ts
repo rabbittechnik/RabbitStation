@@ -2,6 +2,7 @@ import type { Database } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { getBillingDocumentsDir } from '../config/dataPaths.js'
 import { nowIso } from '../utils/timestamps.js'
 
 /* ——— Announcements ——— */
@@ -506,7 +507,7 @@ export function upsertInvoice(db: Database, stationId: string, body: Record<stri
 export function billingRootDir(): string {
   const fromEnv = process.env.STATION_BILLING_DIR?.trim()
   if (fromEnv) return path.isAbsolute(fromEnv) ? fromEnv : path.join(process.cwd(), fromEnv)
-  return path.join(process.cwd(), 'server', 'data', 'station-billing')
+  return getBillingDocumentsDir()
 }
 
 export function listBillingDocuments(db: Database, stationId: string) {

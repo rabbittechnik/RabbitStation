@@ -2,13 +2,14 @@ import type { Database } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { getAbsenceUploadsDir } from '../config/dataPaths.js'
 import { nowIso } from '../utils/timestamps.js'
 
 const MAX_BYTES = 10 * 1024 * 1024
 const ALLOWED = new Set(['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'])
 
 function uploadsRoot(): string {
-  return path.join(process.cwd(), 'server', 'data', 'absence-uploads')
+  return getAbsenceUploadsDir()
 }
 
 export function ensureAbsenceUploadsDir(stationId: string, absenceId: string): string {

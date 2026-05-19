@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/Card'
 import { useStation } from '../../context/station-context'
 import { useAuth } from '../../context/auth-context'
 import { apiGet, apiSend } from '../../services/api'
+import { formatApiError } from '../../lib/apiErrors'
 
 type RateRow = {
   id: string
@@ -42,7 +43,7 @@ export function MinimumWageSettingsPage() {
     setError(null)
     const res = await apiGet<{ items: RateRow[] }>('/minimum-wage-rates')
     if (!res.ok) {
-      setError(res.error)
+      setError(formatApiError(res))
       setItems([])
     } else {
       setItems(res.data.items)
@@ -72,7 +73,7 @@ export function MinimumWageSettingsPage() {
       hourlyRate: hr,
       note: note.trim() || null,
     })
-    if (!res.ok) setError(res.error)
+    if (!res.ok) setError(formatApiError(res))
     else {
       setValidFrom('')
       setHourlyRate('')
@@ -87,7 +88,7 @@ export function MinimumWageSettingsPage() {
     if (!window.confirm('Diesen Mindestlohn-Eintrag wirklich löschen?')) return
     setLoading(true)
     const res = await apiSend<{ ok: boolean }>('DELETE', `/minimum-wage-rates/${id}`)
-    if (!res.ok) setError(res.error)
+    if (!res.ok) setError(formatApiError(res))
     else await load()
     setLoading(false)
   }
@@ -107,8 +108,42 @@ export function MinimumWageSettingsPage() {
     <div className="mx-auto max-w-3xl space-y-6 p-6 pb-16">
       <PageHeader
         title="Mindestlohn"
-        description="Zentrale Tabelle mit Gültig-ab-Datum · wird für Minijob/Aushilfe/geringfügig in der Lohnabrechnung tagesgenau verwendet"
+        description="Gesetzlicher Mindestlohn Deutschland und zentrale Stundenlohn-Tabelle für die Lohnprüfung"
       />
+
+      <Card padding="md" className="border-cyan-500/25 bg-cyan-950/20">
+        <h2 className="text-sm font-semibold text-[var(--text-main)]">Gesetzlicher Mindestlohn Deutschland</h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Der gesetzliche Mindestlohn gilt deutschlandweit. Diese Werte dienen der Prüfung und Vorbereitung der
+          Lohnabrechnung.
+        </p>
+        <table className="mt-3 w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-[var(--text-faint)]">
+              <th className="py-2 pr-3">Gültig ab</th>
+              <th className="py-2">Betrag</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-white/5">
+              <td className="py-2 pr-3 tabular-nums">01.01.2025</td>
+              <td className="py-2">{formatEuroDe(12.82)}</td>
+            </tr>
+            <tr className="border-b border-white/5">
+              <td className="py-2 pr-3 tabular-nums">01.01.2026</td>
+              <td className="py-2">{formatEuroDe(13.9)}</td>
+            </tr>
+            <tr>
+              <td className="py-2 pr-3 tabular-nums">01.01.2027</td>
+              <td className="py-2">{formatEuroDe(14.6)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="mt-3 text-[10px] leading-relaxed text-[var(--text-faint)]">
+          Hinweis: RabbitStation ersetzt keine steuerliche oder arbeitsrechtliche Beratung. Fehlende Stichtage können Sie
+          unten in der Historie ergänzen.
+        </p>
+      </Card>
 
       {error ? (
         <p className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">{error}</p>

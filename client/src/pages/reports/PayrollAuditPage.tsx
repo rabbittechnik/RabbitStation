@@ -6,6 +6,9 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { useStation } from '../../context/station-context'
 import { apiGet } from '../../services/api'
+import { usePlanEntitlements } from '../../hooks/usePlanEntitlements'
+import { FeatureLockedCard } from '../../components/plan/FeatureLockedCard'
+import { formatApiError } from '../../lib/apiErrors'
 
 type ValidationIssue = {
   severity: 'warning' | 'error'
@@ -52,6 +55,7 @@ function defaultPeriod(): { from: string; to: string } {
 
 export function PayrollAuditPage() {
   const { stationId, hasPermission } = useStation()
+  const { hasFeature, planName } = usePlanEntitlements()
   const canView = hasPermission('payroll.view') || hasPermission('reports.payroll')
   const { from: defFrom, to: defTo } = defaultPeriod()
   const [from, setFrom] = useState(defFrom)
@@ -70,7 +74,7 @@ export function PayrollAuditPage() {
     if (!vRes.ok) {
       setValidation(null)
       setCombined(null)
-      setError(vRes.error)
+      setError(formatApiError(vRes))
       setLoading(false)
       return
     }
@@ -112,6 +116,14 @@ export function PayrollAuditPage() {
       <div className="mx-auto max-w-lg space-y-4 p-6">
         <h1 className="text-xl font-semibold text-[var(--text-main)]">Lohnprüfung</h1>
         <p className="text-sm text-[var(--text-muted)]">Bitte zuerst eine Station auswählen.</p>
+      </div>
+    )
+  }
+
+  if (!hasFeature('payroll_audit')) {
+    return (
+      <div className="p-6">
+        <FeatureLockedCard feature="payroll_audit" currentPlan={planName} />
       </div>
     )
   }

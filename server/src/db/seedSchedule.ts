@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
+import { isDemoSeedEnabled } from '../config/dataPaths.js'
 import { DEFAULT_STATION_ID } from '../constants.js'
 import { nowIso } from '../utils/timestamps.js'
 import {
@@ -140,6 +141,14 @@ export type SeedImportedStationGuideResult = {
 export function seedImportedStationGuideSchedule(
   db: Database.Database,
 ): SeedImportedStationGuideResult {
+  if (!isDemoSeedEnabled()) {
+    return {
+      skipped: true,
+      reason: 'demo_seed_disabled',
+      shiftsInserted: 0,
+      absencesInserted: 0,
+    }
+  }
   const empty = db.prepare(`SELECT COUNT(*) as c FROM employees`).get() as { c: number }
   if ((empty?.c ?? 0) === 0) {
     return { skipped: true, reason: 'no_employees', shiftsInserted: 0, absencesInserted: 0 }

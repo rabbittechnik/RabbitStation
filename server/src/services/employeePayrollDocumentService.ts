@@ -2,6 +2,7 @@ import type { Database } from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { getPayrollDocumentsDir, getDocumentsDir } from '../config/dataPaths.js'
 import { nowIso } from '../utils/timestamps.js'
 
 const MAX_BYTES = 15 * 1024 * 1024
@@ -46,15 +47,14 @@ export type EmployeePayrollDocumentApi = {
 function payrollDocsRoot(): string {
   const fromEnv = process.env.EMPLOYEE_PAYROLL_DOCUMENTS_DIR?.trim()
   if (fromEnv) return path.isAbsolute(fromEnv) ? fromEnv : path.join(process.cwd(), fromEnv)
-  const direct = path.join(process.cwd(), 'data', 'payroll-documents')
-  const nested = path.join(process.cwd(), 'server', 'data', 'payroll-documents')
-  if (fs.existsSync(direct) || !fs.existsSync(nested)) return direct
-  return nested
+  return getPayrollDocumentsDir()
 }
 
 function allowedRoots(): string[] {
   return [
     path.resolve(payrollDocsRoot()),
+    path.resolve(getPayrollDocumentsDir()),
+    path.resolve(getDocumentsDir()),
     path.resolve(process.cwd(), 'data', 'payroll-documents'),
     path.resolve(process.cwd(), 'server', 'data', 'payroll-documents'),
   ]

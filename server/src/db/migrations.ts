@@ -224,6 +224,7 @@ export function runMigrations(db: Database.Database) {
   ensureEmployeePayrollDocumentsTable(db)
   mergeEmployeePayrollDocumentsPermissionsIntoAccess(db)
   ensureSteveScheifenEmployee(db)
+  ensureMinimumWageRatesSeeded(db)
   runSaasMigrations(db)
   runOnboardingMigrations(db)
 }
@@ -1099,20 +1100,41 @@ function migrateEmployeeExtendedColumns(db: Database.Database) {
   ).run()
 }
 
+/** Gesetzliche Mindestlohn-Defaults Deutschland (idempotent pro valid_from). */
 export function ensureMinimumWageRatesSeeded(db: Database.Database) {
   const tbl = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='minimum_wage_rates'`).get() as
     | { name: string }
     | undefined
   if (!tbl) return
-  const c = (db.prepare(`SELECT COUNT(*) as n FROM minimum_wage_rates`).get() as { n: number }).n
-  if ((c ?? 0) > 0) return
   const ts = nowIso()
+  const exists = db.prepare(`SELECT id FROM minimum_wage_rates WHERE valid_from = ? LIMIT 1`)
   const ins = db.prepare(
     `INSERT INTO minimum_wage_rates (id, valid_from, hourly_rate, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
   )
-  ins.run('mwr-2025-01-01', '2025-01-01', 12.82, 'Standard Startwert', ts, ts)
-  ins.run('mwr-2026-01-01', '2026-01-01', 13.9, 'Standard Startwert', ts, ts)
-  ins.run('mwr-2027-01-01', '2027-01-01', 14.6, 'Standard Startwert', ts, ts)
+  const defaults: { id: string; valid_from: string; hourly_rate: number; note: string }[] = [
+    {
+      id: 'mwr-de-2025-01-01',
+      valid_from: '2025-01-01',
+      hourly_rate: 12.82,
+      note: 'Gesetzlicher Mindestlohn Deutschland',
+    },
+    {
+      id: 'mwr-de-2026-01-01',
+      valid_from: '2026-01-01',
+      hourly_rate: 13.9,
+      note: 'Gesetzlicher Mindestlohn Deutschland',
+    },
+    {
+      id: 'mwr-de-2027-01-01',
+      valid_from: '2027-01-01',
+      hourly_rate: 14.6,
+      note: 'Gesetzlicher Mindestlohn Deutschland',
+    },
+  ]
+  for (const row of defaults) {
+    if (exists.get(row.valid_from)) continue
+    ins.run(row.id, row.valid_from, row.hourly_rate, row.note, ts, ts)
+  }
 }
 
 function migrateShiftBakingNoticesToBackshopAck(db: Database.Database) {

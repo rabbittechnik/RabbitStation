@@ -1,13 +1,18 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Lock } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSidebar } from '../../store/sidebar-context'
-import { navEntries, type NavEntry, type NavGroup } from './navConfig'
+import { navEntries, type NavEntry, type NavGroup, type NavLeaf } from './navConfig'
 import { useAuth } from '../../context/auth-context'
 import { useStation } from '../../context/station-context'
 import { canAccessTimeApprovalsPage, canApproveTimeEntries } from '../../utils/timeApproval'
-import { featureForPath } from '../../data/planFeatures'
+import { featureForPath, type FeatureKey } from '../../data/planFeatures'
 import { usePlanEntitlements } from '../../hooks/usePlanEntitlements'
+import { PlanFeatureUpgradeModal } from '../plan/PlanUpgradeModal'
+
+type NavLeafView = NavLeaf & { planLocked?: boolean; planFeature?: FeatureKey }
+type NavGroupView = Omit<NavGroup, 'children'> & { children: NavLeafView[] }
+type NavEntryView = Extract<NavEntry, { type: 'single' }> | NavGroupView
 
 function pathMatches(pathname: string, to: string) {
   if (to === '/dashboard') return pathname === '/dashboard' || pathname === '/'
@@ -59,13 +64,15 @@ function NavGroupSection({
   onToggle,
   pathname,
   onNavigate,
+  onPlanLocked,
 }: {
-  group: NavGroup
+  group: NavGroupView
   collapsed: boolean
   open: boolean
   onToggle: () => void
   pathname: string
   onNavigate: () => void
+  onPlanLocked: (feature: FeatureKey) => void
 }) {
   const Icon = group.icon
   const childActive = group.children.some((c) => pathMatches(pathname, c.to))
@@ -113,24 +120,43 @@ function NavGroupSection({
       </button>
       {open ? (
         <div className="mt-0.5 space-y-0.5 border-l border-[var(--border-subtle)] pl-3 ml-4">
-          {group.children.map((c) => (
-            <NavLink
-              key={c.to}
-              to={c.to}
-              data-tour={c.dataTour}
-              onClick={onNavigate}
-              className={() => {
-                const active = pathMatches(pathname, c.to)
-                return `block rounded-[var(--radius-sm)] py-2 pl-3 pr-2 text-sm transition ${
-                  active
-                    ? 'border-l-2 border-[var(--sidebar-active-border)] bg-gradient-to-r from-cyan-500/15 to-transparent font-medium text-[var(--text-main)] shadow-[inset_0_0_24px_rgba(34,211,238,0.06)]'
-                    : 'text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-main)]'
-                }`
-              }}
-            >
-              {c.label}
-            </NavLink>
-          ))}
+          {group.children.map((c) => {
+            if (c.planLocked && c.planFeature) {
+              return (
+                <button
+                  key={c.to}
+                  type="button"
+                  data-tour={c.dataTour}
+                  onClick={() => {
+                    onPlanLocked(c.planFeature!)
+                    onNavigate()
+                  }}
+                  className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] py-2 pl-3 pr-2 text-left text-sm text-[var(--text-muted)] opacity-80 transition hover:bg-white/5 hover:text-[var(--text-main)]"
+                >
+                  <span>{c.label}</span>
+                  <Lock className="h-3.5 w-3.5 shrink-0 text-cyan-400/80" aria-hidden />
+                </button>
+              )
+            }
+            return (
+              <NavLink
+                key={c.to}
+                to={c.to}
+                data-tour={c.dataTour}
+                onClick={onNavigate}
+                className={() => {
+                  const active = pathMatches(pathname, c.to)
+                  return `block rounded-[var(--radius-sm)] py-2 pl-3 pr-2 text-sm transition ${
+                    active
+                      ? 'border-l-2 border-[var(--sidebar-active-border)] bg-gradient-to-r from-cyan-500/15 to-transparent font-medium text-[var(--text-main)] shadow-[inset_0_0_24px_rgba(34,211,238,0.06)]'
+                      : 'text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-main)]'
+                  }`
+                }}
+              >
+                {c.label}
+              </NavLink>
+            )
+          })}
         </div>
       ) : null}
     </div>
@@ -183,7 +209,8 @@ export function Sidebar() {
   const canSeeTimeApprovals = canAccessTimeApprovalsPage(user)
   const canApprove = canApproveTimeEntries(user)
   const { hasFeature: hasPlanFeature } = usePlanEntitlements()
-  const visibleNav = useMemo(() => {
+  const [upgradeFeature, setUpgradeFeature] = useState<FeatureKey | null>(null)
+  const visibleNav = useMemo((): NavEntryView[] => {
     return navEntries
       .filter((e) => {
         if (e.type === 'single' && e.globalAdminOnly && !user?.globalAdmin) return false
@@ -203,18 +230,22 @@ export function Sidebar() {
         if (e.type !== 'group') return e
         return {
           ...e,
-          children: e.children.filter((c) => {
-            if (c.globalAdminOnly && !user?.globalAdmin) return false
-            if (c.approverOnly && !canSeeTimeApprovals) return false
-            if (c.anyPermission?.length) {
-              const ok = c.anyPermission.some((k) => hasPermission(k))
-              if (!ok) return false
-            }
-            const feat = featureForPath(c.to)
-            if (feat && !hasPlanFeature(feat)) return false
-            return true
-          }),
-        }
+          children: e.children
+            .filter((c) => {
+              if (c.globalAdminOnly && !user?.globalAdmin) return false
+              if (c.approverOnly && !canSeeTimeApprovals) return false
+              if (c.anyPermission?.length) {
+                const ok = c.anyPermission.some((k) => hasPermission(k))
+                if (!ok) return false
+              }
+              return true
+            })
+            .map((c) => {
+              const feat = featureForPath(c.to)
+              const planLocked = Boolean(feat && !hasPlanFeature(feat))
+              return { ...c, planLocked, planFeature: feat }
+            }),
+        } satisfies NavGroupView
       })
       .filter((e) => (e.type === 'group' ? e.children.length > 0 : true))
   }, [canApprove, canSeeTimeApprovals, hasPermission, hasPlanFeature, user?.globalAdmin, user?.stationAccess])
@@ -308,16 +339,23 @@ export function Sidebar() {
             return (
               <NavGroupSection
                 key={entry.id}
-                group={entry}
+                group={entry as NavGroupView}
                 collapsed={collapsed}
                 open={isGroupOpen(entry.id)}
                 onToggle={() => toggleGroup(entry.id)}
                 pathname={pathname}
                 onNavigate={closeMobile}
+                onPlanLocked={(f) => setUpgradeFeature(f)}
               />
             )
           })}
         </nav>
+
+        <PlanFeatureUpgradeModal
+          open={upgradeFeature != null}
+          onClose={() => setUpgradeFeature(null)}
+          feature={upgradeFeature ?? 'payroll_audit'}
+        />
 
         <div
           className={`border-t border-[var(--border-subtle)] px-3 py-3 text-[10px] leading-relaxed text-[var(--text-faint)] ${

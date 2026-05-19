@@ -5,6 +5,7 @@ import { toISODate } from '../../data/mockSchedule'
 import { calculateOpenShiftsForWeek, type OpenShiftWeekSummary } from '../../data/defaultShiftRequirements'
 import { useShiftRequirementOptions } from '../../hooks/useShiftRequirementOptions'
 import { apiGet } from '../../services/api'
+import { isPlanErrorCode } from '../../lib/apiErrors'
 import { localTodayYmd } from '../../utils/dateFormat'
 import { useAbsences } from '../../context/absences-context'
 import { useStation } from '../../context/station-context'
@@ -62,20 +63,23 @@ export function useDashboardLiveStats() {
       apiGet<ScheduleShift[]>('/shifts/open', { stationId }),
     ])
     const errs: string[] = []
+    const pushErr = (e: string, code?: string) => {
+      if (!isPlanErrorCode(code ?? e)) errs.push(e)
+    }
     if (!tRes.ok) {
-      errs.push(tRes.error)
+      pushErr(tRes.error, tRes.code)
       setTodayShifts([])
     } else {
       setTodayShifts(Array.isArray(tRes.data) ? tRes.data : [])
     }
     if (!wRes.ok) {
-      errs.push(wRes.error)
+      pushErr(wRes.error, wRes.code)
       setWeekShifts([])
     } else {
       setWeekShifts(Array.isArray(wRes.data) ? wRes.data : [])
     }
     if (!oRes.ok) {
-      errs.push(oRes.error)
+      pushErr(oRes.error, oRes.code)
       setOpenShifts([])
     } else {
       setOpenShifts(Array.isArray(oRes.data) ? oRes.data : [])

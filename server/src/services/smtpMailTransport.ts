@@ -1,4 +1,9 @@
-import nodemailer, { type Transporter } from 'nodemailer'
+import nodemailer, { type SentMessageInfo, type Transporter } from 'nodemailer'
+import { classifySmtpError } from './smtpMailErrors.js'
+import { getMailFrom, isSmtpConfigured } from './smtpConfig.js'
+
+export type { MailFromConfig, SmtpConfigSnapshot } from './smtpConfig.js'
+export { getMailFrom, getSmtpConfigSnapshot, isSmtpConfigured } from './smtpConfig.js'
 
 export type SendMailPayload = {
   to: string
@@ -7,26 +12,18 @@ export type SendMailPayload = {
   text: string
 }
 
-export type MailFromConfig = {
-  name: string
-  address: string
+export type SendMailResult = {
+  messageId?: string
+  accepted: string[]
+  rejected: string[]
+  response?: string
 }
+
+export type VerifyMailTransportResult =
+  | { ok: true }
+  | { ok: false; errorCode: string; safeMessage: string; smtpResponse?: string }
 
 let cachedTransport: Transporter | null | undefined
-
-export function getMailFrom(): MailFromConfig {
-  const address =
-    process.env.MAIL_FROM_ADDRESS?.trim() ||
-    process.env.SMTP_FROM?.trim() ||
-    process.env.SMTP_USER?.trim() ||
-    'noreply@rabbitstation.local'
-  const name = process.env.MAIL_FROM_NAME?.trim() || process.env.APP_NAME?.trim() || 'RabbitStation Pro'
-  return { name, address }
-}
-
-export function isSmtpConfigured(): boolean {
-  return Boolean(process.env.SMTP_HOST?.trim())
-}
 
 function createTransport(): Transporter | null {
   const host = process.env.SMTP_HOST?.trim()
@@ -62,17 +59,60 @@ export function resetSmtpTransportCache(): void {
   cachedTransport = undefined
 }
 
-export async function sendViaSmtp(payload: SendMailPayload): Promise<void> {
+function normalizeSendResult(info: SentMessageInfo): SendMailResult {
+  const accepted = (Array.isArray(info.accepted) ? info.accepted : []).map(String)
+  const rejected = (Array.isArray(info.rejected) ? info.rejected : []).map(String)
+  return {
+    messageId: info.messageId ? String(info.messageId) : undefined,
+    accepted,
+    rejected,
+    response: typeof info.response === 'string' ? info.response : undefined,
+  }
+}
+
+/** Prüft SMTP-Verbindung und Login (nodemailer verify). */
+export async function verifyMailTransport(): Promise<VerifyMailTransportResult> {
   const transport = getSmtpTransport()
   if (!transport) {
-    throw new Error('SMTP nicht konfiguriert')
+    return {
+      ok: false,
+      errorCode: 'smtp_not_configured',
+      safeMessage: 'SMTP ist nicht konfiguriert.',
+    }
+  }
+  try {
+    await transport.verify()
+    return { ok: true }
+  } catch (err) {
+    const c = classifySmtpError(err)
+    return {
+      ok: false,
+      errorCode: c.errorCode,
+      safeMessage: c.safeMessage,
+      smtpResponse: c.smtpResponse,
+    }
+  }
+}
+
+export async function sendViaSmtp(payload: SendMailPayload): Promise<SendMailResult> {
+  const transport = getSmtpTransport()
+  if (!transport) {
+    throw Object.assign(new Error('SMTP nicht konfiguriert'), { code: 'smtp_not_configured' })
   }
   const from = getMailFrom()
-  await transport.sendMail({
+  const info = await transport.sendMail({
     from: `"${from.name}" <${from.address}>`,
     to: payload.to,
     subject: payload.subject,
     html: payload.html,
     text: payload.text,
   })
+  const result = normalizeSendResult(info)
+  if (result.rejected.length > 0) {
+    throw Object.assign(new Error('Empfänger vom SMTP-Server abgelehnt'), {
+      code: 'smtp_recipient_rejected',
+      response: result.response,
+    })
+  }
+  return result
 }

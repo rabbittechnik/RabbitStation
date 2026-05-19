@@ -63,4 +63,5 @@ describe('platform admin API for Control Center', () => {
     expect(res.status).toBe(404)
     expect(body.ok).toBe(false)
   })
+
 })

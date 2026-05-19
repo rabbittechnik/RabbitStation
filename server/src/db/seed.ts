@@ -9,6 +9,7 @@ import {
   DEMO_STATION,
   DEMO_STATION_ID,
 } from '../constants/demo.js'
+import { isDemoSeedEnabled } from '../config/dataPaths.js'
 import { nowIso } from '../utils/timestamps.js'
 
 type EmpSeed = {
@@ -216,9 +217,7 @@ export function isDatabaseReallyEmpty(db: Database.Database): boolean {
 
 function shouldRunDemoSeed(db: Database.Database): boolean {
   if (tableCount(db, 'employees') > 0 || tableCount(db, 'users') > 0) return false
-  if (process.env.SEED_DEMO === '1') return true
-  if (process.env.NODE_ENV === 'production') return false
-  return true
+  return isDemoSeedEnabled()
 }
 
 export function seedIfEmpty(db: Database.Database) {

@@ -9,8 +9,11 @@ import { TuvReportsToolbar } from '../../components/tuv/TuvReportsToolbar'
 import { TuvReportsList } from '../../components/tuv/TuvReportsList'
 import { TuvReportCard } from '../../components/tuv/TuvReportCard'
 import { TuvReportMonthPicker } from '../../components/tuv/TuvReportMonthPicker'
+import { usePlanEntitlements } from '../../hooks/usePlanEntitlements'
+import { FeatureLockedCard } from '../../components/plan/FeatureLockedCard'
 
 export function TuvReportsPage() {
+  const { hasFeature, planName } = usePlanEntitlements()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
@@ -143,6 +146,14 @@ export function TuvReportsPage() {
     }
     setModal(false)
     navigate(`/tuv-berichte/${json.data.report.id}`)
+  }
+
+  if (!hasFeature('monthly_tuv_report')) {
+    return (
+      <div className="p-6">
+        <FeatureLockedCard feature="monthly_tuv_report" currentPlan={planName} />
+      </div>
+    )
   }
 
   if (!canView) {

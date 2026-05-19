@@ -14,13 +14,45 @@ import {
   SupportSessionError,
   countActiveSupportSessions,
 } from '../services/supportSessionService.js'
+import { getBackupDir } from '../config/dataPaths.js'
 import { getTenantById } from '../services/tenantService.js'
+import { sendAdminTestMail } from '../services/mailTestService.js'
 
 export const platformAdminRouter = Router()
 platformAdminRouter.use(requirePlatformAdmin)
 
 platformAdminRouter.get('/health', (_req, res) => {
   jsonOk(res, buildAdminHealthPayload())
+})
+
+platformAdminRouter.post('/mail/test', async (req, res) => {
+  const body = req.body as { to?: string; verifyFirst?: boolean }
+  const to = typeof body.to === 'string' ? body.to : ''
+  const result = await sendAdminTestMail({
+    to,
+    verifyFirst: body.verifyFirst !== false,
+  })
+  if (result.ok) {
+    return res.status(200).json({
+      ok: true,
+      message: result.message,
+      messageId: result.messageId,
+      accepted: result.accepted,
+      rejected: result.rejected,
+      ...(result.smtpResponse ? { smtpResponse: result.smtpResponse } : {}),
+      ...(result.verify ? { verify: result.verify } : {}),
+    })
+  }
+  return res.status(502).json({
+    ok: false,
+    message: result.message,
+    errorCode: result.errorCode,
+    ...(result.smtpResponse ? { smtpResponse: result.smtpResponse } : {}),
+    ...(result.hint ? { hint: result.hint } : {}),
+    ...(result.verify ? { verify: result.verify } : {}),
+    ...(result.accepted ? { accepted: result.accepted } : {}),
+    ...(result.rejected ? { rejected: result.rejected } : {}),
+  })
 })
 
 platformAdminRouter.get('/tenants', (_req, res) => {
@@ -163,7 +195,8 @@ platformAdminRouter.post('/support-sessions/:id/end', (req, res) => {
 })
 
 platformAdminRouter.get('/backups/status', (_req, res) => {
-  const configured = Boolean(process.env.BACKUP_PATH?.trim())
+  const backupDir = getBackupDir()
+  const configured = Boolean(process.env.BACKUP_DIR?.trim() || process.env.BACKUP_PATH?.trim() || backupDir)
   jsonOk(res, {
     configured,
     lastBackupAt: null,

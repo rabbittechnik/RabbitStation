@@ -4,6 +4,7 @@ import type { ScheduleAssistantApplyResult, ScheduleAssistantGenerateResult } fr
 import { getEmployeeAppDeviceHeaders } from '../pages/employee-app/employeeAppStorage'
 import { DEFAULT_FETCH_TIMEOUT_MS, fetchWithTimeout, isAbortError } from '../lib/fetchWithTimeout'
 import { API_BASE } from '../lib/apiBase'
+import { normalizeApiFailure } from '../lib/apiErrors'
 
 export { DEFAULT_FETCH_TIMEOUT_MS, API_BASE }
 
@@ -14,7 +15,17 @@ const TOKEN_SESSION_LEGACY = 'neonshift_admin_token_session'
 
 export type ApiEnvelope<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string; code?: string; details?: Record<string, unknown> }
+  | { ok: false; error: string; code?: string; message?: string; details?: Record<string, unknown> }
+
+function normalizeFailureEnvelope<T>(json: ApiEnvelope<T> & { message?: string }): ApiEnvelope<T> {
+  if (json.ok !== false) return json
+  const norm = normalizeApiFailure({
+    error: json.error,
+    message: json.message,
+    code: json.code,
+  })
+  return { ...json, error: norm.error, code: norm.code ?? json.code }
+}
 
 export function getAdminToken(): string | null {
   if (typeof window === 'undefined') return null
@@ -101,7 +112,7 @@ export async function apiGet<T>(
   if (res.status === 401) onUnauthorized()
   const json = (await res.json()) as ApiEnvelope<T> & { result?: string; employee?: unknown; timeEntry?: unknown }
   if (!res.ok && json && typeof json === 'object' && 'ok' in json && json.ok === false) {
-    return json as ApiEnvelope<T>
+    return normalizeFailureEnvelope(json as ApiEnvelope<T> & { message?: string })
   }
   if (!res.ok) {
     return { ok: false, error: `HTTP ${res.status}` }
@@ -132,7 +143,7 @@ export async function apiSend<T>(
   if (res.status === 401) onUnauthorized()
   const json = (await res.json()) as ApiEnvelope<T>
   if (!res.ok && json && typeof json === 'object' && 'ok' in json && json.ok === false) {
-    return json as ApiEnvelope<T>
+    return normalizeFailureEnvelope(json as ApiEnvelope<T> & { message?: string })
   }
   if (!res.ok) {
     return { ok: false, error: `HTTP ${res.status}` }
@@ -174,7 +185,7 @@ export async function apiUploadMultipart<T>(
   if (res.status === 401) onUnauthorized()
   const json = (await res.json()) as ApiEnvelope<T>
   if (!res.ok && json && typeof json === 'object' && 'ok' in json && json.ok === false) {
-    return json as ApiEnvelope<T>
+    return normalizeFailureEnvelope(json as ApiEnvelope<T> & { message?: string })
   }
   if (!res.ok) {
     return { ok: false, error: `HTTP ${res.status}` }
@@ -197,7 +208,7 @@ export async function apiUploadMultipartMethod<T>(
   if (res.status === 401) onUnauthorized()
   const json = (await res.json()) as ApiEnvelope<T>
   if (!res.ok && json && typeof json === 'object' && 'ok' in json && json.ok === false) {
-    return json as ApiEnvelope<T>
+    return normalizeFailureEnvelope(json as ApiEnvelope<T> & { message?: string })
   }
   if (!res.ok) {
     return { ok: false, error: `HTTP ${res.status}` }
