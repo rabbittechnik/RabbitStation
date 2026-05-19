@@ -1,9 +1,9 @@
-# Railway: Root Directory = Repo-Root empfohlen; alternativ client/ mit buildCommand cd ..
+# Railway WORKDIR = Monorepo-Root (/app). Kein "cd .." — das wechselt nach "/" und scheitert.
 [build]
 builder = "railpack"
-buildCommand = "cd .. && npm run build"
+buildCommand = "npm run build"
 
 [deploy]
-startCommand = "node scripts/start-production.mjs"
+startCommand = "node client/scripts/start-production.mjs"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300

@@ -4,7 +4,7 @@ builder = "railpack"
 buildCommand = "npm run build"
 
 [deploy]
-startCommand = "npm run start -w server"
+startCommand = "node client/scripts/start-production.mjs"
 healthcheckPath = "/api/health"
 # Build baut Client + Server; Server kann optional client/dist mit ausliefern (SERVE_CLIENT_STATIC=1)
 healthcheckTimeout = 300
