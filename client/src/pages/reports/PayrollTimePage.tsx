@@ -10,6 +10,7 @@ import { useStation } from '../../context/station-context'
 import { apiGet } from '../../services/api'
 import { PayrollTimeMainTable } from '../../components/reports/PayrollTimeMainTable'
 import { PayrollDetailExtraFields } from '../../components/reports/PayrollDetailExtraFields'
+import { useRequirePlanFeature } from '../../hooks/useRequirePlanFeature'
 
 type EmploymentFilter =
   | 'all'
@@ -145,6 +146,7 @@ const EXPORT_COL_HEADERS = [
 export function PayrollTimePage() {
   const { user } = useAuth()
   const { stationId, selectedStation, hasPermission } = useStation()
+  const hasPayrollTimeTracking = useRequirePlanFeature('payroll_time_tracking')
   const canView = hasPermission('payroll.view') || hasPermission('reports.payroll')
   const canExport = hasPermission('reports.export') || hasPermission('payroll.export')
 
@@ -347,6 +349,14 @@ export function PayrollTimePage() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Lohn')
     XLSX.writeFile(wb, `lohn-zeiterfassung_${from}_${to}.xlsx`)
+  }
+
+  if (!hasPayrollTimeTracking) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Lohnabrechnung (Zeiterfassung)" description="Lohnauswertung auf Basis der Zeiterfassung." />
+      </div>
+    )
   }
 
   if (!stationId) {

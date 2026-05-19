@@ -1,10 +1,19 @@
 import 'dotenv/config'
 import { createApp } from './app.js'
-import { initDatabase } from './db/database.js'
+import { initDatabase, closeDatabase } from './db/database.js'
 import { startBackupScheduler } from './services/backupScheduler.js'
 import { getSmtpConfigSnapshot } from './services/smtpConfig.js'
+import { DatabasePersistenceError } from './config/databasePersistence.js'
 
-initDatabase()
+try {
+  initDatabase()
+} catch (e) {
+  if (e instanceof DatabasePersistenceError) {
+    console.error('[startup] FATAL:', e.message)
+    process.exit(1)
+  }
+  throw e
+}
 startBackupScheduler()
 
 const smtpSnap = getSmtpConfigSnapshot()
@@ -26,6 +35,7 @@ const server = app.listen(PORT, HOST, () => {
 function shutdown(signal: string) {
   console.log(`Received ${signal}, closing HTTP server…`)
   server.close((err) => {
+    closeDatabase()
     if (err) console.error('Error while closing server:', err)
     process.exit(err ? 1 : 0)
   })

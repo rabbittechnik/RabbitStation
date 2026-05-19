@@ -19,30 +19,46 @@ export function isDemoSeedEnabled(): boolean {
   return !isProductionEnv()
 }
 
+export function getProductionDataRoot(): string {
+  const mount = process.env.RAILWAY_VOLUME_MOUNT_PATH?.trim()
+  if (mount) return mount.replace(/\/$/, '')
+  return PRODUCTION_DATA_ROOT
+}
+
 export function getDatabasePath(): string {
   const fromEnv = process.env.DATABASE_PATH?.trim()
+  const dataRoot = getProductionDataRoot()
+
   if (fromEnv) {
     const posixPath = fromEnv.replace(/\\/g, '/')
-    if (isProductionEnv() && isPosixUnderDataRoot(posixPath)) {
-      return posixPath
+    if (isProductionEnv()) {
+      const root = dataRoot.replace(/\\/g, '/')
+      if (isPosixUnderDataRoot(posixPath) || posixPath.startsWith(`${root}/`)) {
+        return posixPath
+      }
+      console.warn(
+        `[dataPaths] DATABASE_PATH (${posixPath}) liegt nicht im Volume ${root}. ` +
+          `Verwende ${posix.join(root, DEFAULT_DATABASE_FILENAME)}`,
+      )
+      return posix.join(root, DEFAULT_DATABASE_FILENAME)
     }
     return path.resolve(fromEnv)
   }
   if (isProductionEnv()) {
-    return posix.join(PRODUCTION_DATA_ROOT, DEFAULT_DATABASE_FILENAME)
+    return posix.join(dataRoot, DEFAULT_DATABASE_FILENAME)
   }
   return path.resolve(process.cwd(), 'data', DEFAULT_DATABASE_FILENAME)
 }
 
 export function getDataRoot(): string {
-  if (isProductionEnv()) return PRODUCTION_DATA_ROOT
+  if (isProductionEnv()) return getProductionDataRoot()
   return path.resolve(process.cwd(), 'data')
 }
 
 function resolveDir(envKey: string, productionSubdir: string, devSubdir: string): string {
   const fromEnv = process.env[envKey]?.trim()
   if (fromEnv) return path.resolve(fromEnv)
-  if (isProductionEnv()) return posix.join(PRODUCTION_DATA_ROOT, productionSubdir)
+  if (isProductionEnv()) return posix.join(getProductionDataRoot(), productionSubdir)
   return path.resolve(process.cwd(), 'data', devSubdir)
 }
 
@@ -176,7 +192,7 @@ export function buildStorageHealthSnapshot(): StorageHealthSnapshot {
       'Datenbank liegt nicht im persistenten Volume /data. Datenverlust bei Deploy möglich.'
   }
 
-  const dataPath = isProductionEnv() ? PRODUCTION_DATA_ROOT : getDataRoot()
+  const dataPath = isProductionEnv() ? getProductionDataRoot() : getDataRoot()
   const dataPathExists = fs.existsSync(dataPath)
   const dataPathWritable = dataPathExists && isDirectoryWritable(dataPath)
   const backupDir = getBackupDir()
@@ -222,7 +238,7 @@ export function logPersistentStorageStartup(): void {
   ensurePersistentDirectories()
   const dbPath = getDatabasePath()
   const dbInfo = getDatabaseFileInfo(dbPath)
-  const dataPath = isProductionEnv() ? PRODUCTION_DATA_ROOT : getDataRoot()
+  const dataPath = isProductionEnv() ? getProductionDataRoot() : getDataRoot()
   const dataExists = fs.existsSync(dataPath)
   const dataWritable = dataExists && isDirectoryWritable(dataPath)
 

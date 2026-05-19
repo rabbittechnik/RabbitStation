@@ -9,7 +9,7 @@ import { sendRegistrationWelcomeEmail } from './registrationWelcomeEmailService.
 import { loginAdminUser } from './authService.js'
 import { ensureStationStatutoryHolidaysSeeded } from './stationExtraHolidayService.js'
 import { tenantToApi } from './tenantService.js'
-import { normalizePlanId } from '../constants/plans.js'
+import { normalizePlanId, planDisplayName } from '../constants/plans.js'
 
 export type RegisterBody = {
   companyName: string
@@ -160,13 +160,25 @@ export function registerNewTenant(db: Database, body: RegisterBody, req?: import
     /* optional */
   }
 
+  const registrationAuditBase = {
+    tenantId,
+    tenantName: companyName,
+    companyName,
+    stationName,
+    userId,
+    userName: displayName,
+    userEmail: email,
+    tenantSlug: slug,
+    plan,
+  }
+
   appendTenantAudit(db, {
     tenantId,
     userId,
     action: 'tenant.created',
     entityType: 'tenant',
     entityId: tenantId,
-    metadata: { companyName, plan },
+    metadata: registrationAuditBase,
     req,
   })
   appendTenantAudit(db, {
@@ -175,6 +187,7 @@ export function registerNewTenant(db: Database, body: RegisterBody, req?: import
     action: 'registration.completed',
     entityType: 'user',
     entityId: userId,
+    metadata: registrationAuditBase,
     req,
   })
 
@@ -184,9 +197,11 @@ export function registerNewTenant(db: Database, body: RegisterBody, req?: import
     name: displayName,
     companyName,
     stationName,
+    planLabel: planDisplayName(plan),
     trialEnd,
     setupUrl: `${publicUrl}/setup`,
     loginUrl: `${publicUrl}/login`,
+    appUrl: publicUrl,
     db,
     tenantId,
     userId,

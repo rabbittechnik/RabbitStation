@@ -11,6 +11,7 @@ import { useEmployees } from '../../context/employees-context'
 import { apiGet } from '../../services/api'
 import { PayrollSummaryMainTable } from '../../components/reports/PayrollSummaryMainTable'
 import { PayrollDetailExtraFields } from '../../components/reports/PayrollDetailExtraFields'
+import { useRequirePlanFeature } from '../../hooks/useRequirePlanFeature'
 
 type EmploymentFilter =
   | 'all'
@@ -216,6 +217,7 @@ const COL_HEADERS_EXPORT = [
 export function PayrollSummaryPage() {
   const { user } = useAuth()
   const { stationId, selectedStation, hasPermission } = useStation()
+  const hasPayrollAudit = useRequirePlanFeature('payroll_audit')
   const { employees } = useEmployees()
   const employeesList = useMemo(
     () => employees.map((e) => ({ id: e.id, displayName: e.displayName })),
@@ -573,6 +575,17 @@ export function PayrollSummaryPage() {
       else n.add(key)
       return n
     })
+  }
+
+  if (!hasPayrollAudit) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Lohnabrechnung Zusammenfassung"
+          description="Kombinierte Lohnauswertung aus Schichtplan und Zeiterfassung."
+        />
+      </div>
+    )
   }
 
   if (!stationId) {

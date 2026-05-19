@@ -11,14 +11,16 @@ describe('registrationWelcomeEmail', () => {
     name: 'Max Mustermann',
     companyName: 'Mustermann Tankstellen GmbH',
     stationName: 'Tankstelle Nord',
+    planLabel: 'Pro',
     trialEnd: '26.05.2026',
     setupUrl: 'https://app.example.com/setup',
     loginUrl: 'https://app.example.com/login',
+    appUrl: 'https://app.example.com',
   }
 
   it('uses the specified subject line', () => {
     expect(REGISTRATION_WELCOME_SUBJECT).toContain('Willkommen bei RabbitStation Pro')
-    expect(REGISTRATION_WELCOME_SUBJECT).toContain('Testphase')
+    expect(REGISTRATION_WELCOME_SUBJECT).toBe('Willkommen bei RabbitStation Pro')
   })
 
   it('renders HTML with dynamic fields', () => {

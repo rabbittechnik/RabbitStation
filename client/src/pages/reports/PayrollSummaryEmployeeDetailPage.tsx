@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card'
 import { useStation } from '../../context/station-context'
 import { apiGet } from '../../services/api'
 import { PayrollDetailExtraFields } from '../../components/reports/PayrollDetailExtraFields'
+import { useRequirePlanFeature } from '../../hooks/useRequirePlanFeature'
 import {
   PAYROLL_TABLE,
   PAYROLL_THEAD_ROW,
@@ -262,6 +263,7 @@ export function PayrollSummaryEmployeeDetailPage() {
   const { employeeId } = useParams<{ employeeId: string }>()
   const [searchParams] = useSearchParams()
   const { stationId, hasPermission } = useStation()
+  const hasPayrollAudit = useRequirePlanFeature('payroll_audit')
 
   const from = searchParams.get('from') ?? ''
   const to = searchParams.get('to') ?? ''
@@ -346,6 +348,17 @@ export function PayrollSummaryEmployeeDetailPage() {
 
   const emp = data?.employee
   const audit = data?.audit
+
+  if (!hasPayrollAudit) {
+    return (
+      <PageShell>
+        <PageHeader
+          title="Lohnabrechnung Zusammenfassung"
+          description="Kombinierte Lohnauswertung aus Schichtplan und Zeiterfassung."
+        />
+      </PageShell>
+    )
+  }
 
   if (!canView) {
     return (

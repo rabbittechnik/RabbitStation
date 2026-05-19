@@ -6,6 +6,7 @@ import {
   isDemoSeedEnabled,
   logPersistentStorageStartup,
 } from '../config/dataPaths.js'
+import { prepareDatabaseFileBeforeOpen } from '../config/databasePersistence.js'
 import { runSchema } from './schema.js'
 import { runMigrations } from './migrations.js'
 import { seedIfEmpty } from './seed.js'
@@ -29,6 +30,7 @@ export function getDb(): Database.Database {
 export function initDatabase(): Database.Database {
   const t0 = Date.now()
   logPersistentStorageStartup()
+  prepareDatabaseFileBeforeOpen()
 
   const dbPath = getDatabasePath()
   const dbExisted = fs.existsSync(dbPath)

@@ -20,16 +20,22 @@ type RouteRule = {
 const ROUTE_FEATURE_RULES: RouteRule[] = [
   { match: (p) => p.startsWith('/api/time-entries'), feature: 'time_tracking' },
   {
-    match: (p) => p.startsWith('/api/reports/payroll-audit') || p.includes('/payroll-audit'),
+    match: (p) =>
+      p.startsWith('/api/reports/payroll-audit') ||
+      p.includes('/payroll-audit') ||
+      p.startsWith('/api/reports/payroll-combined') ||
+      p.startsWith('/api/reports/payroll-validation') ||
+      p.startsWith('/api/reports/payroll-summary'),
     feature: 'payroll_audit',
   },
   {
     match: (p) =>
-      p.startsWith('/api/reports/payroll') ||
-      p.startsWith('/api/reports/payroll-time') ||
-      p.startsWith('/api/reports/payroll-schedule') ||
-      p.startsWith('/api/reports/payroll-summary'),
-    feature: 'payroll_audit',
+      p.startsWith('/api/reports/payroll-time') || p.includes('/payroll-time-tracking'),
+    feature: 'payroll_time_tracking',
+  },
+  {
+    match: (p) => p.startsWith('/api/reports/payroll-schedule'),
+    feature: 'payroll_schedule',
   },
   { match: (p) => p.startsWith('/api/tuv-reports'), feature: 'monthly_tuv_report' },
   { match: (p) => p.startsWith('/api/station-tablets'), feature: 'station_tablet' },

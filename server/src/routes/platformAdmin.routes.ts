@@ -5,6 +5,7 @@ import { jsonOk } from '../utils/http.js'
 import { requirePlatformAdmin } from '../middleware/platformAdminGate.js'
 import { tenantToApi } from '../services/tenantService.js'
 import { nowIso } from '../utils/timestamps.js'
+import { listAdminLogs } from '../services/adminLogService.js'
 import { appendTenantAudit } from '../services/tenantAuditService.js'
 import { buildAdminHealthPayload } from '../services/adminHealthService.js'
 import { normalizePlanId } from '../constants/plans.js'
@@ -19,6 +20,7 @@ import { getTenantById } from '../services/tenantService.js'
 import { mailTestFailureToJson, sendAdminTestMail } from '../services/mailTestService.js'
 import { buildSmtpFailureDetails } from '../services/smtpMailTransport.js'
 import { getSmtpConfigSnapshot } from '../services/smtpConfig.js'
+import { resendWelcomeEmail } from '../services/resendWelcomeEmailService.js'
 import {
   createBackup,
   getBackupStatusResponse,
@@ -79,6 +81,43 @@ platformAdminRouter.get('/mail/config-check', (_req, res) => {
   })
 })
 
+function resendWelcomeEmailStatus(error: string): number {
+  if (error === 'tenant_not_found' || error === 'user_not_found') return 404
+  if (error === 'missing_email') return 400
+  if (error === 'rate_limit') return 429
+  return 502
+}
+
+platformAdminRouter.post('/tenants/:tenantId/users/:userId/resend-welcome-email', async (req, res) => {
+  try {
+    const { tenantId, userId } = req.params
+    const body = req.body as { reason?: string }
+    const triggeredBy = req.controlCenterApiAuth ? 'control_center' : 'platform_admin'
+    const result = await resendWelcomeEmail(getDb(), {
+      tenantId,
+      userId,
+      reason: typeof body.reason === 'string' ? body.reason : undefined,
+      triggeredBy,
+      req,
+    })
+    if (result.ok) {
+      return res.status(200).json(result)
+    }
+    return res.status(resendWelcomeEmailStatus(result.error)).json(result)
+  } catch (err) {
+    console.error('[admin] resend-welcome-email', err instanceof Error ? err.message : err)
+    return res.status(502).json({
+      ok: false,
+      error: 'mail_send_failed',
+      message: 'Willkommens-E-Mail konnte nicht erneut gesendet werden.',
+      details: {
+        errorCode: 'internal_error',
+        safeMessage: 'Unerwarteter Serverfehler beim Mailversand.',
+      },
+    })
+  }
+})
+
 platformAdminRouter.get('/tenants', (_req, res) => {
   const db = getDb()
   const rows = db
@@ -118,11 +157,8 @@ platformAdminRouter.get('/subscriptions/summary', (_req, res) => {
 
 platformAdminRouter.get('/logs', (req, res) => {
   const limit = Math.min(500, Math.max(1, Number(req.query.limit ?? 100)))
-  const db = getDb()
-  const rows = db
-    .prepare(`SELECT * FROM tenant_audit_logs ORDER BY created_at DESC LIMIT ?`)
-    .all(limit)
-  jsonOk(res, { logs: rows })
+  const logs = listAdminLogs(getDb(), limit)
+  jsonOk(res, { logs })
 })
 
 platformAdminRouter.get('/security/summary', (_req, res) => {

@@ -8,7 +8,7 @@ import { useStation } from '../../context/station-context'
 import { canAccessTimeApprovalsPage, canApproveTimeEntries } from '../../utils/timeApproval'
 import { featureForPath, type FeatureKey } from '../../data/planFeatures'
 import { usePlanEntitlements } from '../../hooks/usePlanEntitlements'
-import { PlanFeatureUpgradeModal } from '../plan/PlanUpgradeModal'
+import { usePlanUpgrade } from '../../context/plan-upgrade-context'
 
 type NavLeafView = NavLeaf & { planLocked?: boolean; planFeature?: FeatureKey }
 type NavGroupView = Omit<NavGroup, 'children'> & { children: NavLeafView[] }
@@ -78,11 +78,35 @@ function NavGroupSection({
   const childActive = group.children.some((c) => pathMatches(pathname, c.to))
 
   if (collapsed) {
-    const first = group.children[0]
+    const unlocked = group.children.find((c) => !c.planLocked)
+    const firstLocked = group.children.find((c) => c.planLocked && c.planFeature)
     const tip = `${group.label}: ${group.children.map((c) => c.label).join(', ')}`
+
+    if (!unlocked && firstLocked?.planFeature) {
+      return (
+        <button
+          type="button"
+          title={tip}
+          onClick={() => {
+            onPlanLocked(firstLocked.planFeature!)
+            onNavigate()
+          }}
+          className={`mb-1 flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] transition ${
+            childActive
+              ? 'bg-[var(--accent-cyan)]/15 text-[var(--accent-cyan)] shadow-[var(--glow-cyan)] ring-1 ring-cyan-400/35'
+              : 'text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-main)]'
+          }`}
+        >
+          <Icon className="h-5 w-5 shrink-0" aria-hidden />
+          <span className="sr-only">{group.label}</span>
+        </button>
+      )
+    }
+
+    const target = unlocked ?? group.children[0]
     return (
       <NavLink
-        to={first?.to ?? '/'}
+        to={target?.to ?? '/'}
         title={tip}
         onClick={onNavigate}
         className={({ isActive }) =>
@@ -209,7 +233,7 @@ export function Sidebar() {
   const canSeeTimeApprovals = canAccessTimeApprovalsPage(user)
   const canApprove = canApproveTimeEntries(user)
   const { hasFeature: hasPlanFeature } = usePlanEntitlements()
-  const [upgradeFeature, setUpgradeFeature] = useState<FeatureKey | null>(null)
+  const { showFeatureLocked } = usePlanUpgrade()
   const visibleNav = useMemo((): NavEntryView[] => {
     return navEntries
       .filter((e) => {
@@ -345,17 +369,11 @@ export function Sidebar() {
                 onToggle={() => toggleGroup(entry.id)}
                 pathname={pathname}
                 onNavigate={closeMobile}
-                onPlanLocked={(f) => setUpgradeFeature(f)}
+                onPlanLocked={showFeatureLocked}
               />
             )
           })}
         </nav>
-
-        <PlanFeatureUpgradeModal
-          open={upgradeFeature != null}
-          onClose={() => setUpgradeFeature(null)}
-          feature={upgradeFeature ?? 'payroll_audit'}
-        />
 
         <div
           className={`border-t border-[var(--border-subtle)] px-3 py-3 text-[10px] leading-relaxed text-[var(--text-faint)] ${

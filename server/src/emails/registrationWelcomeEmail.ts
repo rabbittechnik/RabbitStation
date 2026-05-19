@@ -1,13 +1,14 @@
-export const REGISTRATION_WELCOME_SUBJECT =
-  'Willkommen bei RabbitStation Pro – Ihre Testphase wurde gestartet'
+export const REGISTRATION_WELCOME_SUBJECT = 'Willkommen bei RabbitStation Pro'
 
 export type RegistrationWelcomeEmailVars = {
   name: string
   companyName: string
   stationName: string
+  planLabel: string
   trialEnd: string
   setupUrl: string
   loginUrl: string
+  appUrl: string
 }
 
 function escapeHtml(value: string): string {
@@ -34,8 +35,10 @@ export function buildRegistrationWelcomeHtml(vars: RegistrationWelcomeEmailVars)
   const companyName = escapeHtml(vars.companyName)
   const stationName = escapeHtml(vars.stationName)
   const trialEnd = escapeHtml(vars.trialEnd)
+  const planLabel = escapeHtml(vars.planLabel)
   const setupUrl = escapeHtml(vars.setupUrl)
   const loginUrl = escapeHtml(vars.loginUrl)
+  const appUrl = escapeHtml(vars.appUrl)
 
   return `<!doctype html>
 <html lang="de">
@@ -90,6 +93,9 @@ export function buildRegistrationWelcomeHtml(vars: RegistrationWelcomeEmailVars)
                     <p style="margin:8px 0 0;font-size:15px;color:#94a3b8;">
                       Firma: <strong style="color:#ffffff;">${companyName}</strong>
                     </p>
+                    <p style="margin:8px 0 0;font-size:15px;color:#94a3b8;">
+                      Paket: <strong style="color:#ffffff;">${planLabel}</strong>
+                    </p>
                   </td>
                 </tr>
               </table>
@@ -111,7 +117,8 @@ export function buildRegistrationWelcomeHtml(vars: RegistrationWelcomeEmailVars)
                 </tr>
               </table>
               <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#94a3b8;text-align:center;">
-                Alternativ: <a href="${loginUrl}" style="color:#22d3ee;">Zur Anmeldung</a>
+                <a href="${appUrl}" style="color:#22d3ee;">Zur App</a>
+                · <a href="${loginUrl}" style="color:#22d3ee;">Zur Anmeldung</a>
               </p>
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:24px 0;">
                 <tr>
@@ -133,7 +140,8 @@ export function buildRegistrationWelcomeHtml(vars: RegistrationWelcomeEmailVars)
                 </tr>
               </table>
               <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#94a3b8;">
-                Wenn Sie diese Registrierung nicht selbst durchgeführt haben, können Sie diese E-Mail ignorieren oder uns kontaktieren.
+                Bei Fragen erreichen Sie uns unter der in Ihrem Konto hinterlegten Kontakt-E-Mail oder über den Rabbit-Technik Support.
+                Wenn Sie diese Registrierung nicht selbst durchgeführt haben, können Sie diese E-Mail ignorieren.
               </p>
               <p style="margin:28px 0 0;font-size:16px;line-height:1.6;color:#f8fafc;">
                 Viele Grüße<br>
@@ -168,7 +176,8 @@ export function buildRegistrationWelcomeText(vars: RegistrationWelcomeEmailVars)
     '',
     `Station: ${vars.stationName}`,
     `Firma: ${vars.companyName}`,
-    `Testphase aktiv bis: ${vars.trialEnd}`,
+    `Paket: ${vars.planLabel}`,
+    `Testphase aktiv bis: ${vars.trialEnd} (7 Tage kostenlos testen)`,
     '',
     'RabbitStation Pro unterstützt Sie bei:',
     '- Dienstplan und Schichtmodellen',
@@ -179,6 +188,9 @@ export function buildRegistrationWelcomeText(vars: RegistrationWelcomeEmailVars)
     '- Mitarbeiter-App',
     '- Stationstablet',
     '- Lohn- und Zuschlagsauswertung',
+    '',
+    'Zur App:',
+    vars.appUrl,
     '',
     'Station jetzt einrichten:',
     vars.setupUrl,

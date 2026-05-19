@@ -6,6 +6,12 @@ Am **server**-Service in Railway ein Volume mit Mount Path **`/data`** anlegen.
 
 Ohne dieses Volume gehen SQLite-Datenbank, Uploads und Dokumente bei jedem Redeploy verloren.
 
+In `server/railway.toml` ist `requiredMountPath = "/data"` gesetzt — Deployments ohne Volume schlagen fehl.
+
+**Häufiger Fehler:** Volume existiert (`server-volume`), aber Mount Path ist nicht `/data` oder zeigt auf einen anderen Ordner. Dann schreibt die App in ein **ephemeres** Verzeichnis und bei jedem Git-Push/Deploy sind alle Registrierungen weg.
+
+Prüfen in Railway → Server → Volume → **Mount Path = `/data`** (exakt).
+
 ## Empfohlene Umgebungsvariablen (Production)
 
 ```env

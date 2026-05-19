@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileSpreadsheet, Printer, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { useRequirePlanFeature } from '../../hooks/useRequirePlanFeature'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { useAuth } from '../../context/auth-context'
@@ -137,6 +138,7 @@ const COL_HEADERS_EXPORT = [
 export function PayrollSchedulePage() {
   const { user } = useAuth()
   const { stationId, selectedStation, hasPermission } = useStation()
+  const hasPayrollSchedule = useRequirePlanFeature('payroll_schedule')
   const canView = hasPermission('payroll.view') || hasPermission('reports.payroll')
   const canExport = hasPermission('reports.export') || hasPermission('payroll.export')
 
@@ -336,6 +338,14 @@ export function PayrollSchedulePage() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Lohn')
     XLSX.writeFile(wb, `lohn-schichtplan_${from}_${to}.xlsx`)
+  }
+
+  if (!hasPayrollSchedule) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Lohnabrechnung (Schichtplan)" description="Lohnauswertung auf Basis des Schichtplans." />
+      </div>
+    )
   }
 
   if (!stationId) {

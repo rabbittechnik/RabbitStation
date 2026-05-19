@@ -17,17 +17,22 @@ const COPY: Partial<Record<FeatureKey, Omit<PlanFeatureCopy, 'requiredPlanLabel'
   station_tablet: {
     title: 'Stationstablet ist im Pro-Paket enthalten',
     description:
-      'Das Stationstablet ermöglicht Stempeln, Aufgabenübersicht und Schichtinformationen direkt an der Station. Diese Funktion ist ab RabbitStation Pro verfügbar.',
+      'Mit dem Stationstablet können Mitarbeitende direkt an der Station stempeln, Aufgaben sehen und Schichtinformationen abrufen.',
   },
   monthly_tuv_report: {
     title: 'TÜV-Bericht ist im Pro-Paket enthalten',
     description:
-      'Monatliche TÜV-Checklisten, Erinnerungen und Auswertungen sind ab RabbitStation Pro verfügbar.',
+      'Der monatliche TÜV-Bericht kann mit RabbitStation Pro vorbereitet, erinnert und verwaltet werden.',
+  },
+  payroll_time_tracking: {
+    title: 'Lohnabrechnung aus Zeiterfassung ist im Pro-Paket enthalten',
+    description:
+      'Lohnauswertungen auf Basis echter Stempelzeiten und Freigaben sind ab RabbitStation Pro verfügbar.',
   },
   payroll_audit: {
-    title: 'Lohnprüfung ist im Pro-Paket enthalten',
+    title: 'Lohnprüfung und Plan/Ist-Vergleich sind im Pro-Paket enthalten',
     description:
-      'Lohnprüfung, Zuschläge und detaillierte Lohnauswertungen sind ab RabbitStation Pro verfügbar.',
+      'Lohnprüfung, Plan-Ist-Vergleich und kombinierte Auswertungen aus Zeiterfassung und Schichtplan sind ab RabbitStation Pro verfügbar.',
   },
   surcharges: {
     title: 'Zuschläge sind im Pro-Paket enthalten',
@@ -46,16 +51,12 @@ const COPY: Partial<Record<FeatureKey, Omit<PlanFeatureCopy, 'requiredPlanLabel'
     description:
       'Urlaubssperren und erweiterte Abwesenheitsverwaltung sind ab RabbitStation Pro verfügbar.',
   },
-  holidays: {
-    title: 'Feiertage sind im Pro-Paket enthalten',
-    description: 'Feiertagsverwaltung für die Lohnabrechnung ist ab RabbitStation Pro verfügbar.',
-  },
   contacts: {
     title: 'Kontakte & Vertreter sind im Pro-Paket enthalten',
     description: 'Vertreter und Lieferantenkontakte sind ab RabbitStation Pro verfügbar.',
   },
   protected_documents: {
-    title: 'Erweiterte Dokumente sind im Pro-Paket enthalten',
+    title: 'Geschützte Dokumente sind im Pro-Paket enthalten',
     description: 'Geschützte Dokumentenrechte und erweiterte Ablage sind ab RabbitStation Pro verfügbar.',
   },
   multi_station: {

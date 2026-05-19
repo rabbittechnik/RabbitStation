@@ -11,6 +11,7 @@ import type { TimeEntry } from '../../types/timeTracking'
 import { calculateWorkedMinutes, formatWorkedDuration } from '../../utils/timeTrackingUtils'
 import { earlyLeaveReasonLabelDeClient } from '../../constants/earlyLeaveCheckout'
 import { dispatchNotificationsRefresh } from '../../utils/notificationsRefresh'
+import { useRequirePlanFeature } from '../../hooks/useRequirePlanFeature'
 
 type PendingRow = TimeEntry & {
   employeeDisplayName: string
@@ -150,6 +151,7 @@ export function TimeApprovalsPage() {
   const { user } = useAuth()
   const { stationId } = useStation()
   const [searchParams] = useSearchParams()
+  const hasTimeApprovals = useRequirePlanFeature('time_approvals')
   const allowed = canAccessTimeApprovalsPage(user)
   const canApprove = canApproveTimeEntries(user)
   const canCorrect = canCorrectStampTimes(user)
@@ -379,6 +381,17 @@ export function TimeApprovalsPage() {
     }
     setDetail(res.data)
     dispatchNotificationsRefresh()
+  }
+
+  if (!hasTimeApprovals) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 p-6">
+        <h1 className="text-xl font-semibold text-[var(--text-main)]">Zeitfreigaben</h1>
+        <p className="text-sm text-[var(--text-muted)]">
+          Freigabe und Korrektur von Zeiterfassungen ist ab RabbitStation Pro verfügbar.
+        </p>
+      </div>
+    )
   }
 
   if (!allowed) {

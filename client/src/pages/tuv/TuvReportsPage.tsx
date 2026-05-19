@@ -9,11 +9,10 @@ import { TuvReportsToolbar } from '../../components/tuv/TuvReportsToolbar'
 import { TuvReportsList } from '../../components/tuv/TuvReportsList'
 import { TuvReportCard } from '../../components/tuv/TuvReportCard'
 import { TuvReportMonthPicker } from '../../components/tuv/TuvReportMonthPicker'
-import { usePlanEntitlements } from '../../hooks/usePlanEntitlements'
-import { FeatureLockedCard } from '../../components/plan/FeatureLockedCard'
+import { useRequirePlanFeature } from '../../hooks/useRequirePlanFeature'
 
 export function TuvReportsPage() {
-  const { hasFeature, planName } = usePlanEntitlements()
+  const hasTuvReport = useRequirePlanFeature('monthly_tuv_report')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
@@ -148,10 +147,13 @@ export function TuvReportsPage() {
     navigate(`/tuv-berichte/${json.data.report.id}`)
   }
 
-  if (!hasFeature('monthly_tuv_report')) {
+  if (!hasTuvReport) {
     return (
-      <div className="p-6">
-        <FeatureLockedCard feature="monthly_tuv_report" currentPlan={planName} />
+      <div className="space-y-6">
+        <PageHeader
+          title="TÜV-Berichte"
+          description="Monatliche TÜV-Checklisten und Berichte für Ihre Station."
+        />
       </div>
     )
   }

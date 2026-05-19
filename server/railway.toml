@@ -7,5 +7,7 @@ buildCommand = "npm run build"
 [deploy]
 startCommand = "npm start"
 healthcheckPath = "/api/health"
+# Persistentes Volume für SQLite, Uploads, Backups (Pfad muss /data sein)
+requiredMountPath = "/data"
 # Empfohlen: CONTROL_CENTER_API_TOKEN + ggf. SERVE_CLIENT_STATIC=1 wenn Monorepo-Build client+server
 healthcheckTimeout = 300

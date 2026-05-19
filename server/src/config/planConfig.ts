@@ -10,6 +10,8 @@ export type FeatureKey =
   | 'protected_documents'
   | 'time_tracking'
   | 'time_approvals'
+  | 'payroll_schedule'
+  | 'payroll_time_tracking'
   | 'payroll_audit'
   | 'surcharges'
   | 'holidays'
@@ -40,15 +42,17 @@ const STARTER_FEATURES: FeatureKey[] = [
   'tasks',
   'basic_documents',
   'employee_app',
+  'holidays',
+  'payroll_schedule',
 ]
 
 const PRO_ONLY_FEATURES: FeatureKey[] = [
   'protected_documents',
   'time_tracking',
   'time_approvals',
+  'payroll_time_tracking',
   'payroll_audit',
   'surcharges',
-  'holidays',
   'absences',
   'monthly_tuv_report',
   'station_tablet',

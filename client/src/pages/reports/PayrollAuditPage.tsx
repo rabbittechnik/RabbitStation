@@ -6,8 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { useStation } from '../../context/station-context'
 import { apiGet } from '../../services/api'
-import { usePlanEntitlements } from '../../hooks/usePlanEntitlements'
-import { FeatureLockedCard } from '../../components/plan/FeatureLockedCard'
+import { useRequirePlanFeature } from '../../hooks/useRequirePlanFeature'
 import { formatApiError } from '../../lib/apiErrors'
 
 type ValidationIssue = {
@@ -55,7 +54,7 @@ function defaultPeriod(): { from: string; to: string } {
 
 export function PayrollAuditPage() {
   const { stationId, hasPermission } = useStation()
-  const { hasFeature, planName } = usePlanEntitlements()
+  const hasPayrollAudit = useRequirePlanFeature('payroll_audit')
   const canView = hasPermission('payroll.view') || hasPermission('reports.payroll')
   const { from: defFrom, to: defTo } = defaultPeriod()
   const [from, setFrom] = useState(defFrom)
@@ -120,10 +119,13 @@ export function PayrollAuditPage() {
     )
   }
 
-  if (!hasFeature('payroll_audit')) {
+  if (!hasPayrollAudit) {
     return (
-      <div className="p-6">
-        <FeatureLockedCard feature="payroll_audit" currentPlan={planName} />
+      <div className="space-y-6">
+        <PageHeader
+          title="Lohnprüfung"
+          description="Berechnungsprüfung vor Monatsabschluss — Detailnachweis pro Tag in der Lohnabrechnung Zusammenfassung."
+        />
       </div>
     )
   }

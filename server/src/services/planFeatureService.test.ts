@@ -29,15 +29,21 @@ function mockTenant(plan: string): TenantRow {
 }
 
 describe('planFeatureService', () => {
-  it('starter has schedule but not payroll_audit', () => {
+  it('starter has schedule, holidays and payroll_schedule but not payroll_audit', () => {
     const t = mockTenant('starter')
     assert.equal(hasFeature(t, 'schedule'), true)
+    assert.equal(hasFeature(t, 'holidays'), true)
+    assert.equal(hasFeature(t, 'payroll_schedule'), true)
+    assert.equal(hasFeature(t, 'payroll_time_tracking'), false)
     assert.equal(hasFeature(t, 'payroll_audit'), false)
   })
 
-  it('pro has time_tracking', () => {
+  it('pro has time_tracking and payroll_time_tracking', () => {
     const t = mockTenant('pro')
     assert.equal(hasFeature(t, 'time_tracking'), true)
+    assert.equal(hasFeature(t, 'payroll_schedule'), true)
+    assert.equal(hasFeature(t, 'payroll_time_tracking'), true)
+    assert.equal(hasFeature(t, 'payroll_audit'), true)
   })
 
   it('limits for starter', () => {
