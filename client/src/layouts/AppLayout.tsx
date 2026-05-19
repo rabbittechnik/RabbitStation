@@ -43,7 +43,7 @@ export function AppLayout() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col lg:pl-0">
         <Topbar />
-        <main className="flex-1 overflow-auto px-4 py-5 md:px-6 lg:px-8" data-tour="dashboard">
+        <main className="flex-1 overflow-auto px-4 py-5 md:px-6 lg:px-8">
           <SetupIncompleteBanner />
           <PlanStatusBanner />
           <Outlet />

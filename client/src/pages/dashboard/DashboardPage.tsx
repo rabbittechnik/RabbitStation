@@ -21,6 +21,7 @@ export function DashboardPage() {
       <TuvReportDashboardReminder />
 
       <section
+        data-tour="dashboard-overview"
         className="dashboard-top grid min-w-0 grid-cols-1 gap-4 min-[1401px]:grid-cols-[minmax(260px,0.85fr)_minmax(520px,1.15fr)] min-[1401px]:items-start"
         aria-label="Begrüßung und Kennzahlen"
       >
