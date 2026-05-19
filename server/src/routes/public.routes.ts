@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { getDb } from '../db/database.js'
 import { jsonErr, jsonOk } from '../utils/http.js'
+import { PUBLIC_PLANS } from '../constants/plans.js'
 import { registerNewTenant, createPasswordResetToken, resetPasswordWithToken } from '../services/registrationService.js'
 
 export const publicRouter = Router()
@@ -52,15 +53,5 @@ publicRouter.post('/reset-password', (req, res) => {
 })
 
 publicRouter.get('/plans', (_req, res) => {
-  jsonOk(res, {
-    plans: [
-      {
-        id: 'rabbitstation_pro',
-        name: 'RabbitStation Pro',
-        description: 'Vollständige Stationsverwaltung für Tankstellenbetreiber',
-        trialDays: 7,
-        priceLabel: 'Auf Anfrage (Beta)',
-      },
-    ],
-  })
+  jsonOk(res, { plans: PUBLIC_PLANS })
 })

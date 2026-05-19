@@ -9,6 +9,7 @@ import { sendRegistrationWelcomeEmail } from './registrationWelcomeEmailService.
 import { loginAdminUser } from './authService.js'
 import { ensureStationStatutoryHolidaysSeeded } from './stationExtraHolidayService.js'
 import { tenantToApi } from './tenantService.js'
+import { normalizePlanId } from '../constants/plans.js'
 
 export type RegisterBody = {
   companyName: string
@@ -73,7 +74,7 @@ export function registerNewTenant(db: Database, body: RegisterBody, req?: import
   const stationId = randomUUID()
   const userId = randomUUID()
   const slug = uniqueSlug(db, slugify(companyName))
-  const plan = String(body.plan ?? 'rabbitstation_pro').trim() || 'rabbitstation_pro'
+  const plan = normalizePlanId(body.plan)
   const displayName = `${firstName} ${lastName}`.trim()
   const username = email
   const hash = bcrypt.hashSync(password, 10)
