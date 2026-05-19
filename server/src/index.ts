@@ -2,9 +2,15 @@ import 'dotenv/config'
 import { createApp } from './app.js'
 import { initDatabase } from './db/database.js'
 import { startBackupScheduler } from './services/backupScheduler.js'
+import { getSmtpConfigSnapshot } from './services/smtpConfig.js'
 
 initDatabase()
 startBackupScheduler()
+
+const smtpSnap = getSmtpConfigSnapshot()
+console.info(
+  `[startup] SMTP config: host=${smtpSnap.smtpHost ?? '(not set)'} port=${smtpSnap.smtpPort ?? 587} secure=${smtpSnap.smtpSecure ?? false} userSet=${!smtpSnap.smtpUserMissing && smtpSnap.smtpConfigured} passSet=${!smtpSnap.smtpPassMissing && smtpSnap.smtpConfigured}`,
+)
 
 const app = createApp()
 const PORT = Number(process.env.PORT) || 3001
