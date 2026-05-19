@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom'
 import { Rocket, Sparkles } from 'lucide-react'
 import { WelcomeDialog } from './components/WelcomeDialog'
 import {
+  MarketingDashboardShowcase,
+  MarketingSolutionShowcase,
+} from './components/MarketingProductShowcase'
+import {
   CHALLENGES,
   SECURITY_POINTS,
   SOLUTION_MODULES,
@@ -98,13 +102,8 @@ export function MarketingHomePage() {
             </p>
           </div>
           <div className="relative">
-            <div className="absolute -inset-4 rounded-3xl bg-cyan-500/10 blur-2xl" />
-            <img
-              src="/marketing/flyer-hero.png"
-              alt="RabbitStation Pro auf Desktop, Smartphone und Tablet"
-              className="relative w-full rounded-2xl border border-cyan-500/30 shadow-[0_0_48px_rgba(34,211,238,0.12)]"
-              loading="eager"
-            />
+            <div className="pointer-events-none absolute -inset-1 rounded-3xl bg-cyan-500/8" aria-hidden />
+            <MarketingDashboardShowcase className="relative w-full" />
           </div>
         </div>
       </section>
@@ -137,13 +136,8 @@ export function MarketingHomePage() {
           <p className="mx-auto mt-4 max-w-2xl text-center text-[#94a3b8]">
             Keine allgemeine Bürosoftware – sondern speziell für den echten Tankstellenalltag entwickelt.
           </p>
-          <div className="mt-10 overflow-hidden rounded-2xl border border-cyan-500/25 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
-            <img
-              src="/marketing/flyer-solution.png"
-              alt="Module: Dienstplan, Zeiterfassung, Aufgaben, Dokumente, Zuschläge, Lohnprüfung"
-              className="w-full"
-              loading="lazy"
-            />
+          <div className="mt-10">
+            <MarketingSolutionShowcase />
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {SOLUTION_MODULES.map(({ icon: Icon, title, text }, i) => (
