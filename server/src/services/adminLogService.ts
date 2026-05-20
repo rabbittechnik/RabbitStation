@@ -26,6 +26,9 @@ const ACTION_LABELS: Record<string, string> = {
   login_success: 'Login erfolgreich',
   'login.failed': 'Login fehlgeschlagen',
   login_failed: 'Login fehlgeschlagen',
+  trial_extended: 'Testzeitraum verlängert',
+  trial_extend_failed: 'Testzeitraum-Verlängerung fehlgeschlagen',
+  'subscription.changed': 'Abo geändert',
 }
 
 const WELCOME_MAIL_ACTIONS = new Set([

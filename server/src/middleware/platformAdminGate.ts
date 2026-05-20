@@ -4,7 +4,7 @@ import { getUserTenantContext } from '../services/tenantService.js'
 import { jsonErrAdmin } from '../utils/http.js'
 
 const CC_WRITE_PATH =
-  /^\/api\/admin\/(tenants\/[^/]+\/support-sessions\/start|support-sessions\/[^/]+\/end|tenants\/[^/]+\/subscription|tenants\/[^/]+\/users\/[^/]+\/resend-welcome-email|mail\/test|backups\/create)$/
+  /^\/api\/admin\/(tenants\/[^/]+\/support-sessions\/start|support-sessions\/[^/]+\/end|tenants\/[^/]+\/subscription|tenants\/[^/]+\/trial\/extend|tenants\/[^/]+\/users\/[^/]+\/resend-welcome-email|mail\/test|backups\/create)$/
 
 function controlCenterWriteAllowed(req: Request): boolean {
   if (req.method === 'GET') return true

@@ -22,6 +22,10 @@ export type TenantRow = {
   pro_trial_used?: number
   multi_trial_started_at?: string | null
   multi_trial_used?: number
+  trial_extended_count?: number
+  trial_last_extended_at?: string | null
+  trial_last_extended_by?: string | null
+  trial_extension_note?: string | null
   contact_email: string | null
   contact_phone: string | null
   address_json: string | null
@@ -84,13 +88,14 @@ export function resolveEffectiveTenantId(ctx: UserTenantContext): string | null 
   return ctx.tenantId
 }
 
-export function tenantToApi(t: TenantRow) {
+export function tenantTrialDaysLeft(t: TenantRow, now = new Date()): number | null {
   const trialEnd = t.trial_end ? new Date(t.trial_end) : null
-  const now = new Date()
-  let trialDaysLeft: number | null = null
-  if (trialEnd && t.subscription_status === 'trial') {
-    trialDaysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86400000))
-  }
+  if (!trialEnd || t.subscription_status?.trim() !== 'trial') return null
+  return Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86400000))
+}
+
+export function tenantToApi(t: TenantRow) {
+  const trialDaysLeft = tenantTrialDaysLeft(t)
   return {
     id: t.id,
     companyName: t.company_name,
@@ -100,6 +105,9 @@ export function tenantToApi(t: TenantRow) {
     trialStart: t.trial_start,
     trialEnd: t.trial_end,
     trialDaysLeft,
+    trialExtendedCount: t.trial_extended_count ?? 0,
+    trialLastExtendedAt: t.trial_last_extended_at ?? null,
+    trialLastExtendedBy: t.trial_last_extended_by ?? null,
     setupCompleted: t.setup_completed === 1,
     onboardingTourCompleted: (t.onboarding_tour_completed ?? 0) === 1,
     paymentProvider: t.payment_provider,
@@ -108,5 +116,31 @@ export function tenantToApi(t: TenantRow) {
     blockedReason: t.blocked_reason,
     contactEmail: t.contact_email,
     contactPhone: t.contact_phone,
+  }
+}
+
+export type AdminTenantListRow = TenantRow & {
+  station_count?: number
+  user_count?: number
+  employee_count?: number
+  primary_station_name?: string | null
+  owner_email?: string | null
+  last_activity_at?: string | null
+}
+
+export function adminTenantToApi(row: AdminTenantListRow) {
+  const base = tenantToApi(row)
+  const remainingDays = tenantTrialDaysLeft(row)
+  return {
+    ...base,
+    tenantId: row.id,
+    tenantName: row.company_name,
+    stationName: row.primary_station_name?.trim() || null,
+    ownerEmail: row.owner_email?.trim() || null,
+    remainingDays,
+    lastActivityAt: row.last_activity_at ?? row.updated_at ?? null,
+    employeeCount: Number(row.employee_count ?? 0),
+    stationCount: Number(row.station_count ?? 0),
+    userCount: Number(row.user_count ?? 0),
   }
 }

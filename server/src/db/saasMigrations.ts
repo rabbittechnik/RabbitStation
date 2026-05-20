@@ -116,6 +116,10 @@ export function runSaasMigrations(db: Database.Database) {
   addCol(db, 'tenants', 'pro_trial_used', 'pro_trial_used INTEGER NOT NULL DEFAULT 0')
   addCol(db, 'tenants', 'multi_trial_started_at', 'multi_trial_started_at TEXT')
   addCol(db, 'tenants', 'multi_trial_used', 'multi_trial_used INTEGER NOT NULL DEFAULT 0')
+  addCol(db, 'tenants', 'trial_extended_count', 'trial_extended_count INTEGER NOT NULL DEFAULT 0')
+  addCol(db, 'tenants', 'trial_last_extended_at', 'trial_last_extended_at TEXT')
+  addCol(db, 'tenants', 'trial_last_extended_by', 'trial_last_extended_by TEXT')
+  addCol(db, 'tenants', 'trial_extension_note', 'trial_extension_note TEXT')
 
   addCol(db, 'users', 'tenant_id', 'tenant_id TEXT')
   addCol(db, 'users', 'platform_role', 'platform_role TEXT')

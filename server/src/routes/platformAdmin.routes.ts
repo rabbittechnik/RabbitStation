@@ -3,7 +3,12 @@ import { Router } from 'express'
 import { getDb } from '../db/database.js'
 import { jsonOk } from '../utils/http.js'
 import { requirePlatformAdmin } from '../middleware/platformAdminGate.js'
-import { tenantToApi } from '../services/tenantService.js'
+import {
+  adminTenantToApi,
+  getUserTenantContext,
+  tenantToApi,
+} from '../services/tenantService.js'
+import { extendTenantTrial } from '../services/trialExtendService.js'
 import { nowIso } from '../utils/timestamps.js'
 import { listAdminLogs } from '../services/adminLogService.js'
 import { appendTenantAudit } from '../services/tenantAuditService.js'
@@ -122,17 +127,75 @@ platformAdminRouter.get('/tenants', (_req, res) => {
   const db = getDb()
   const rows = db
     .prepare(
-      `SELECT t.*, (SELECT COUNT(*) FROM stations s WHERE s.tenant_id = t.id) as station_count,
-              (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as user_count
+      `SELECT t.*,
+        (SELECT COUNT(*) FROM stations s WHERE s.tenant_id = t.id) as station_count,
+        (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as user_count,
+        (SELECT COUNT(*) FROM employees e
+           INNER JOIN stations s ON s.id = e.station_id
+           WHERE s.tenant_id = t.id AND (e.deleted_at IS NULL OR trim(e.deleted_at) = '')) as employee_count,
+        (SELECT s.name FROM stations s WHERE s.tenant_id = t.id ORDER BY s.created_at ASC LIMIT 1) as primary_station_name,
+        (SELECT COALESCE(NULLIF(trim(u.email), ''), NULLIF(trim(u.username), ''))
+           FROM users u
+           INNER JOIN roles r ON r.id = u.role_id
+           WHERE u.tenant_id = t.id AND r.role_key = 'tenant_owner'
+           ORDER BY u.id ASC LIMIT 1) as owner_email,
+        (SELECT MAX(a.created_at) FROM tenant_audit_logs a WHERE a.tenant_id = t.id) as last_activity_at
        FROM tenants t ORDER BY t.created_at DESC`,
     )
-    .all() as Record<string, unknown>[]
+    .all() as import('../services/tenantService.js').AdminTenantListRow[]
   jsonOk(res, {
-    tenants: rows.map((r) => ({
-      ...tenantToApi(r as import('../services/tenantService.js').TenantRow),
-      stationCount: Number(r.station_count ?? 0),
-      userCount: Number(r.user_count ?? 0),
-    })),
+    tenants: rows.map((r) => adminTenantToApi(r)),
+  })
+})
+
+function trialExtendActor(req: import('express').Request) {
+  const source = req.controlCenterApiAuth ? 'control_center' : 'platform_admin'
+  let isSuperAdmin = false
+  let extendedByUserId: string | null = null
+  if (req.adminUser?.sub) {
+    extendedByUserId = req.adminUser.sub
+    const ctx = getUserTenantContext(getDb(), req.adminUser.sub)
+    isSuperAdmin = ctx?.platformRole === 'saas_superadmin'
+  }
+  return { source, isSuperAdmin, extendedByUserId } as const
+}
+
+platformAdminRouter.post('/tenants/:tenantId/trial/extend', (req, res) => {
+  const tenantId = String(req.params.tenantId ?? '')
+  const body = req.body as {
+    days?: number
+    newTrialEnd?: string
+    reason?: string
+    note?: string
+  }
+  const actorInfo = trialExtendActor(req)
+  const result = extendTenantTrial(
+    getDb(),
+    tenantId,
+    {
+      days: body.days,
+      newTrialEnd: body.newTrialEnd,
+      reason: typeof body.reason === 'string' ? body.reason : '',
+      note: typeof body.note === 'string' ? body.note : undefined,
+    },
+    {
+      isSuperAdmin: actorInfo.isSuperAdmin,
+      extendedByUserId: actorInfo.extendedByUserId,
+      source: actorInfo.source,
+    },
+    req,
+  )
+  if (!result.ok) {
+    return res.status(result.status).json({
+      ok: false,
+      error: result.error,
+      message: result.message,
+    })
+  }
+  return res.status(200).json({
+    ok: true,
+    message: result.message,
+    data: result.data,
   })
 })
 
