@@ -1,0 +1,40 @@
+---
+description: Railway-Deploy nach Ausfall — alles erneut pushen
+alwaysApply: true
+---
+
+# Railway Deploy (Haupt-App)
+
+Repository: `https://github.com/rabbittechnik/RabbitStation.git`  
+Service: RabbitStation **Haupt-App** auf Railway.
+
+## Wenn Railway down war oder Deploys nicht ankommen
+
+GitHub-Push kann erfolgreich sein, obwohl Railway nichts deployed hat. Dann **nicht** nur `git push` wiederholen (bringt nichts ohne neuen Commit).
+
+### Standard-Ablauf (beide Schritte)
+
+1. **Prüfen:** `git status` sauber? `git log origin/main..HEAD` leer (= alles auf GitHub)?
+2. **Neuen Deploy auslösen** (leerer Commit + Push auf `main`):
+
+```powershell
+cd "C:\Users\rabbi\Documents\Projekt Webapp Leer RabbitStation"
+git pull origin main
+git commit --allow-empty -m "chore: Railway-Redeploy ausloesen"
+git push origin main
+```
+
+3. **Railway-Dashboard:** Service → Deployments → letztes Deployment / „Redeploy“ prüfen (Build Success).
+
+### Wenn noch uncommittete Änderungen existieren
+
+Zuerst committen und pushen, **dann** optional leeren Redeploy-Commit (oder der Feature-Commit reicht als Trigger).
+
+### Control Center (separates Repo)
+
+Gleicher Ablauf in `C:\Users\rabbi\Documents\Projekt Verkauf WEBAPP`  
+→ `https://github.com/rabbittechnik/RabbitStationControllCenter.git`
+
+### Merksatz für den Nutzer
+
+> „Railway war down — bitte **alles neu pushen** (leerer Commit + Push auf beiden Repos) und Deploy im Dashboard prüfen.“
