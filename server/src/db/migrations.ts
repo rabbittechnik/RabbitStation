@@ -216,8 +216,8 @@ export function runMigrations(db: Database.Database) {
   ensureBodelshausenSundayHolidaySurchargePolicy(db)
   ensureDemoStationSundayHolidaySurchargePolicy(db)
   ensurePayrollQueryIndexes(db)
-  ensureStationHolidayPayrollColumns(db)
   ensureStationHolidayOptionsColumn(db)
+  ensureStationHolidayPayrollColumns(db)
   ensureStationDocumentTemplateColumns(db)
   ensureTuvReportExtendedColumns(db)
   ensureTimeEntryCorrections2026(db)
@@ -2035,6 +2035,7 @@ function ensureBodelshausenSundayHolidaySurchargePolicy(db: Database.Database) {
 
 /** Feiertagsverwaltung: Kategorie, Zeitraum, Referenz-Prozent (Anzeige; Lohn nutzt Mitarbeiterprofil). */
 function ensureStationHolidayPayrollColumns(db: Database.Database) {
+  ensureStationHolidayOptionsColumn(db)
   const cols = new Set(
     (db.prepare(`PRAGMA table_info(station_extra_holidays)`).all() as { name: string }[]).map((c) => c.name),
   )
@@ -2078,6 +2079,10 @@ function ensureStationHolidayPayrollColumns(db: Database.Database) {
 
 function ensureStationHolidayOptionsColumn(db: Database.Database) {
   const cols = new Set((db.prepare(`PRAGMA table_info(stations)`).all() as { name: string }[]).map((c) => c.name))
+  if (!cols.has('federal_state')) {
+    db.exec(`ALTER TABLE stations ADD COLUMN federal_state TEXT DEFAULT 'BW'`)
+    db.exec(`UPDATE stations SET federal_state = 'BW' WHERE federal_state IS NULL OR trim(federal_state) = ''`)
+  }
   if (!cols.has('station_holiday_options_json')) {
     db.exec(`ALTER TABLE stations ADD COLUMN station_holiday_options_json TEXT NOT NULL DEFAULT '{}'`)
   }

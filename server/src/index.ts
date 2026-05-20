@@ -8,11 +8,14 @@ import { DatabasePersistenceError } from './config/databasePersistence.js'
 try {
   initDatabase()
 } catch (e) {
+  const msg = e instanceof Error ? e.message : String(e)
   if (e instanceof DatabasePersistenceError) {
-    console.error('[startup] FATAL:', e.message)
+    console.error('[startup] FATAL:', msg)
     process.exit(1)
   }
-  throw e
+  console.error('[startup] FATAL: Datenbank-Migration fehlgeschlagen:', msg)
+  if (e instanceof Error && e.stack) console.error(e.stack)
+  process.exit(1)
 }
 startBackupScheduler()
 
