@@ -217,6 +217,7 @@ export function runMigrations(db: Database.Database) {
   ensureDemoStationSundayHolidaySurchargePolicy(db)
   ensurePayrollQueryIndexes(db)
   ensureStationHolidayPayrollColumns(db)
+  ensureStationHolidayOptionsColumn(db)
   ensureStationDocumentTemplateColumns(db)
   ensureTuvReportExtendedColumns(db)
   ensureTimeEntryCorrections2026(db)
@@ -2072,6 +2073,17 @@ function ensureStationHolidayPayrollColumns(db: Database.Database) {
   const stations = db.prepare(`SELECT id FROM stations`).all() as { id: string }[]
   for (const s of stations) {
     ensureStationStatutoryHolidaysSeeded(db, s.id, 2026)
+  }
+}
+
+function ensureStationHolidayOptionsColumn(db: Database.Database) {
+  const cols = new Set((db.prepare(`PRAGMA table_info(stations)`).all() as { name: string }[]).map((c) => c.name))
+  if (!cols.has('station_holiday_options_json')) {
+    db.exec(`ALTER TABLE stations ADD COLUMN station_holiday_options_json TEXT NOT NULL DEFAULT '{}'`)
+  }
+  if (!cols.has('federal_state_setup_completed')) {
+    db.exec(`ALTER TABLE stations ADD COLUMN federal_state_setup_completed INTEGER NOT NULL DEFAULT 0`)
+    db.exec(`UPDATE stations SET federal_state_setup_completed = 1`)
   }
 }
 

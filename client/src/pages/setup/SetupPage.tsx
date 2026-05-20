@@ -4,12 +4,19 @@ import { apiGet, apiSend } from '../../services/api'
 import { useAuth } from '../../context/auth-context'
 import { Button } from '../../components/ui/Button'
 import { setSetupDeferred } from '../../components/auth/RequireSetup'
+import {
+  GERMAN_FEDERAL_STATES,
+  GERMAN_STATE_LABELS,
+  parseGermanState,
+  type GermanState,
+} from '../../data/germanFederalStates'
 
 type ShiftTypeKey = 'early' | 'middle' | 'late' | 'night' | 'office' | 'custom'
 
 type SetupState = {
   setupCompleted: boolean
   stationId: string | null
+  federalStateSetupCompleted?: boolean
   shiftSetupCompleted: boolean
   monthlyTuvReportEnabled: boolean | null
   setupOwnerAnswered: boolean
@@ -26,7 +33,7 @@ const SHIFT_DEFS: { type: ShiftTypeKey; label: string; start: string; end: strin
   { type: 'office', label: 'Büro / Verwaltung', start: '08:00', end: '17:00' },
 ]
 
-const TOTAL_STEPS = 6
+const TOTAL_STEPS = 7
 
 export function SetupPage() {
   const { token, refreshMe } = useAuth()
@@ -54,6 +61,8 @@ export function SetupPage() {
   const [empFirst, setEmpFirst] = useState('')
   const [empLast, setEmpLast] = useState('')
   const [skipEmployee, setSkipEmployee] = useState(true)
+  const [setupFederalState, setSetupFederalState] = useState<GermanState>('BW')
+  const [setupBavariaAssumption, setSetupBavariaAssumption] = useState(false)
 
   const reload = useCallback(async () => {
     const r = await apiGet<SetupState>('/setup/state')
@@ -61,11 +70,12 @@ export function SetupPage() {
       setState(r.data)
       if (r.data.monthlyTuvReportEnabled != null) setTuvEnabled(r.data.monthlyTuvReportEnabled)
       if (r.data.setupOwnerAnswered) setOwnerEnabled(r.data.ownerAsEmployeeEnabled)
-      if (r.data.setupCompleted) setStep(6)
-      else if (!r.data.shiftSetupCompleted) setStep(2)
-      else if (r.data.monthlyTuvReportEnabled == null) setStep(3)
-      else if (!r.data.setupOwnerAnswered) setStep(5)
-      else setStep(6)
+      if (r.data.setupCompleted) setStep(7)
+      else if (!r.data.federalStateSetupCompleted) setStep(2)
+      else if (!r.data.shiftSetupCompleted) setStep(3)
+      else if (r.data.monthlyTuvReportEnabled == null) setStep(4)
+      else if (!r.data.setupOwnerAnswered) setStep(6)
+      else setStep(7)
     }
   }, [])
 
@@ -85,6 +95,24 @@ export function SetupPage() {
   }
 
   const stationId = state?.stationId ?? ''
+
+  const saveFederalState = async () => {
+    if (!stationId) return
+    setBusy(true)
+    setErr(null)
+    const res = await apiSend('POST', '/setup/federal-state', {
+      stationId,
+      federalState: setupFederalState,
+      options: { bavariaAssumptionDayEnabled: setupBavariaAssumption },
+    })
+    setBusy(false)
+    if (!res.ok) {
+      setErr(res.error)
+      return
+    }
+    await reload()
+    setStep(3)
+  }
 
   const saveShifts = async () => {
     if (!stationId) return
@@ -111,7 +139,7 @@ export function SetupPage() {
       return
     }
     await reload()
-    setStep(3)
+    setStep(4)
   }
 
   const saveTuv = async () => {
@@ -124,12 +152,12 @@ export function SetupPage() {
       return
     }
     await reload()
-    setStep(4)
+    setStep(5)
   }
 
   const saveEmployee = async () => {
     if (skipEmployee) {
-      setStep(5)
+      setStep(6)
       return
     }
     if (!empFirst.trim() || !empLast.trim()) {
@@ -148,7 +176,7 @@ export function SetupPage() {
       return
     }
     await reload()
-    setStep(5)
+    setStep(6)
   }
 
   const saveOwner = async () => {
@@ -161,7 +189,7 @@ export function SetupPage() {
       return
     }
     await reload()
-    setStep(6)
+    setStep(7)
   }
 
   const finish = async () => {
@@ -217,6 +245,49 @@ export function SetupPage() {
         : null}
 
         {step === 2 ?
+          <section>
+            <h1 className="text-xl font-semibold text-cyan-100">Bundesland Ihrer Tankstelle</h1>
+            <p className="mt-2 text-sm text-[#a8b8d8]">
+              In welchem Bundesland befindet sich Ihre Tankstelle? Die gesetzlichen Feiertage werden dafür automatisch
+              für das aktuelle und das nächste Jahr angelegt.
+            </p>
+            <label className="mt-6 block text-sm">
+              <span className="mb-1 block text-[#a8b8d8]">Bundesland</span>
+              <select
+                className="w-full rounded-lg border border-cyan-500/30 bg-[#0a1220] px-3 py-2"
+                value={setupFederalState}
+                onChange={(e) => setSetupFederalState(parseGermanState(e.target.value))}
+              >
+                {GERMAN_FEDERAL_STATES.map((code) => (
+                  <option key={code} value={code}>
+                    {GERMAN_STATE_LABELS[code]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {setupFederalState === 'BY' ?
+              <label className="mt-4 flex items-start gap-2 text-sm text-[#a8b8d8]">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={setupBavariaAssumption}
+                  onChange={(e) => setSetupBavariaAssumption(e.target.checked)}
+                />
+                <span>Mariä Himmelfahrt gilt in Bayern nur in bestimmten Gemeinden (optional aktivieren).</span>
+              </label>
+            : null}
+            <div className="mt-8 flex gap-3">
+              <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                Zurück
+              </Button>
+              <Button type="button" disabled={busy} onClick={() => void saveFederalState()}>
+                Weiter
+              </Button>
+            </div>
+          </section>
+        : null}
+
+        {step === 3 ?
           <section>
             <h1 className="text-xl font-semibold text-cyan-100">Schichtmodelle</h1>
             <p className="mt-2 text-sm text-[#a8b8d8]">Welche Schichten nutzen Sie? Mindestens eine auswählen.</p>
@@ -296,7 +367,7 @@ export function SetupPage() {
               </li>
             </ul>
             <div className="mt-8 flex gap-3">
-              <Button type="button" variant="outline" onClick={() => setStep(1)}>
+              <Button type="button" variant="outline" onClick={() => setStep(2)}>
                 Zurück
               </Button>
               <Button type="button" disabled={busy} onClick={() => void saveShifts()}>
@@ -306,7 +377,7 @@ export function SetupPage() {
           </section>
         : null}
 
-        {step === 3 ?
+        {step === 4 ?
           <section>
             <h1 className="text-xl font-semibold text-cyan-100">Monatlicher TÜV-Bericht</h1>
             <p className="mt-2 text-sm text-[#a8b8d8]">Möchten Sie monatliche TÜV-Sicherheitsberichte führen?</p>
@@ -321,7 +392,7 @@ export function SetupPage() {
               </label>
             </div>
             <div className="mt-8 flex gap-3">
-              <Button type="button" variant="outline" onClick={() => setStep(2)}>
+              <Button type="button" variant="outline" onClick={() => setStep(3)}>
                 Zurück
               </Button>
               <Button type="button" disabled={busy || tuvEnabled == null} onClick={() => void saveTuv()}>
@@ -331,7 +402,7 @@ export function SetupPage() {
           </section>
         : null}
 
-        {step === 4 ?
+        {step === 5 ?
           <section>
             <h1 className="text-xl font-semibold text-cyan-100">Erster Mitarbeiter</h1>
             <p className="mt-2 text-sm text-[#a8b8d8]">Optional — Sie können Mitarbeiter auch später anlegen.</p>
@@ -356,7 +427,7 @@ export function SetupPage() {
               </div>
             : null}
             <div className="mt-8 flex gap-3">
-              <Button type="button" variant="outline" onClick={() => setStep(3)}>
+              <Button type="button" variant="outline" onClick={() => setStep(4)}>
                 Zurück
               </Button>
               <Button type="button" disabled={busy} onClick={() => void saveEmployee()}>
@@ -366,7 +437,7 @@ export function SetupPage() {
           </section>
         : null}
 
-        {step === 5 ?
+        {step === 6 ?
           <section>
             <h1 className="text-xl font-semibold text-cyan-100">Sie im Schichtplan</h1>
             <p className="mt-2 text-sm text-[#a8b8d8]">Sollen Sie selbst als Mitarbeiter im Plan erscheinen?</p>
@@ -386,7 +457,7 @@ export function SetupPage() {
               </label>
             </div>
             <div className="mt-8 flex gap-3">
-              <Button type="button" variant="outline" onClick={() => setStep(4)}>
+              <Button type="button" variant="outline" onClick={() => setStep(5)}>
                 Zurück
               </Button>
               <Button type="button" disabled={busy || ownerEnabled == null} onClick={() => void saveOwner()}>
@@ -396,10 +467,11 @@ export function SetupPage() {
           </section>
         : null}
 
-        {step === 6 ?
+        {step === 7 ?
           <section>
             <h1 className="text-xl font-semibold text-cyan-100">Fertig</h1>
             <ul className="mt-4 space-y-2 text-sm text-[#a8b8d8]">
+              <li>{state?.federalStateSetupCompleted ? '✓' : '○'} Bundesland & Feiertage</li>
               <li>{state?.shiftSetupCompleted ? '✓' : '○'} Schichtmodelle</li>
               <li>{state?.monthlyTuvReportEnabled != null ? '✓' : '○'} TÜV-Entscheidung</li>
               <li>{state?.setupOwnerAnswered ? '✓' : '○'} Inhaber im Plan</li>
@@ -414,3 +486,4 @@ export function SetupPage() {
     </div>
   )
 }
+

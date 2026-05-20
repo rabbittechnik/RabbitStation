@@ -21,6 +21,8 @@ import { getUserTenantContext, getTenantById } from '../services/tenantService.j
 import { canAddStation } from '../services/planFeatureService.js'
 import { handlePlanError } from '../middleware/planFeatureGate.js'
 import { listShiftTemplates } from '../services/shiftTemplateService.js'
+import * as extraHolidayService from '../services/stationExtraHolidayService.js'
+import { requirePermission } from '../middleware/stationAuth.js'
 
 export const stationsRouter = Router()
 
@@ -260,6 +262,56 @@ stationsRouter.post('/:id/restore', (req, res) => {
     if (!ctx || !canMutateStationDirectory(ctx)) return jsonErr(res, 'Keine Berechtigung', 403)
     stationService.restoreStation(getDb(), req.params.id)
     jsonOk(res, { restored: true })
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
+  }
+})
+
+stationsRouter.get('/:id/holiday-settings', (req, res) => {
+  try {
+    const stationId = req.params.id
+    if (!requirePermission(req, res, stationId, 'settings.view')) return
+    jsonOk(res, extraHolidayService.getStationHolidaySettings(getDb(), stationId))
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Fehler', 500)
+  }
+})
+
+stationsRouter.patch('/:id/holiday-settings', (req, res) => {
+  try {
+    const stationId = req.params.id
+    if (!requirePermission(req, res, stationId, 'settings.edit')) return
+    const body = req.body as { federalState?: string; options?: { bavariaAssumptionDayEnabled?: boolean } }
+    jsonOk(
+      res,
+      extraHolidayService.updateStationHolidaySettings(getDb(), stationId, {
+        federalState: body.federalState,
+        options: body.options,
+      }),
+    )
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
+  }
+})
+
+stationsRouter.post('/:id/holidays/regenerate', (req, res) => {
+  try {
+    const stationId = req.params.id
+    if (!requirePermission(req, res, stationId, 'settings.edit')) return
+    const body = req.body as {
+      year?: number
+      federalState?: string
+      preserveManualChanges?: boolean
+    }
+    const year = Number(body.year) || new Date().getFullYear()
+    const result = extraHolidayService.regenerateStationHolidays(
+      getDb(),
+      stationId,
+      year,
+      body.federalState,
+      body.preserveManualChanges !== false,
+    )
+    jsonOk(res, result)
   } catch (e) {
     jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
   }

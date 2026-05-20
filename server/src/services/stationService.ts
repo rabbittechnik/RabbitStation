@@ -2,6 +2,8 @@ import type { Database } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import { nowIso } from '../utils/timestamps.js'
 import { seedStationShiftCloseChecklistDefsFromBuiltInCatalog } from './stationShiftChecklistDefService.js'
+import { seedStationHolidaysForYears } from './stationExtraHolidayService.js'
+import { parseGermanState } from '../data/germanFederalStates.js'
 
 export function listStations(db: Database) {
   return db.prepare(`SELECT * FROM stations ORDER BY name`).all()
@@ -218,6 +220,11 @@ export function createStation(db: Database, body: Record<string, unknown>) {
     db.prepare(`UPDATE stations SET tenant_id = ? WHERE id = ?`).run(tenantId, id)
   }
   seedStationShiftCloseChecklistDefsFromBuiltInCatalog(db, id)
+  const y = new Date().getFullYear()
+  seedStationHolidaysForYears(db, id, [y, y + 1], parseGermanState(body.federalState, 'BW'))
+  if (cols.has('federal_state_setup_completed')) {
+    db.prepare(`UPDATE stations SET federal_state_setup_completed = 1 WHERE id = ?`).run(id)
+  }
   return getStation(db, id)
 }
 

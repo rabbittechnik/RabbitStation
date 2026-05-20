@@ -11,7 +11,9 @@ import {
   createSetupFirstEmployee,
   completeOnboardingTour,
   resetOnboardingTour,
+  saveSetupFederalState,
 } from '../services/setupService.js'
+import { parseGermanState } from '../data/germanFederalStates.js'
 import { getUserTenantContext } from '../services/tenantService.js'
 import { requireStationId } from '../middleware/stationAuth.js'
 import type { ShiftTemplateInput } from '../services/shiftTemplateService.js'
@@ -24,6 +26,32 @@ setupRouter.get('/state', (req, res) => {
     return
   }
   jsonOk(res, getSetupState(getDb(), req.adminUser.sub))
+})
+
+setupRouter.post('/federal-state', (req, res) => {
+  if (!req.adminUser) {
+    jsonErr(res, 'Nicht angemeldet', 401)
+    return
+  }
+  const body = req.body as {
+    stationId?: string
+    federalState?: string
+    options?: { bavariaAssumptionDayEnabled?: boolean }
+  }
+  const stationId = String(body.stationId ?? '')
+  if (!requireStationId(req, res, stationId)) return
+  try {
+    saveSetupFederalState(
+      getDb(),
+      req.adminUser.sub,
+      stationId,
+      parseGermanState(body.federalState, 'BW'),
+      body.options ?? {},
+    )
+    jsonOk(res, { ok: true })
+  } catch (e) {
+    jsonErr(res, e instanceof Error ? e.message : 'Fehler', 400)
+  }
 })
 
 setupRouter.post('/shift-templates', (req, res) => {

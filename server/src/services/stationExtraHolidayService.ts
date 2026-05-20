@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
-import { getStationHolidaySeedTemplates } from '../data/stationHolidayDefaults.js'
-import type { GermanState } from '../data/germanHolidays2026.js'
+import { getStationHolidaySeedTemplates, type StationHolidayOptions } from '../data/stationHolidayDefaults.js'
+import { GERMAN_STATE_LABELS, parseGermanState, type GermanState } from '../data/germanFederalStates.js'
 import {
   categoryToPayrollTier,
   referencePercentForCategory,
@@ -154,15 +154,174 @@ export function getStationFederalState(db: Database, stationId: string): GermanS
   const row = db.prepare(`SELECT federal_state FROM stations WHERE id = ?`).get(stationId) as
     | { federal_state: string | null }
     | undefined
-  const fs = String(row?.federal_state ?? 'BW').trim().toUpperCase()
-  if (fs.length === 2) return fs as GermanState
-  return 'BW'
+  return parseGermanState(row?.federal_state, 'BW')
+}
+
+export function getStationHolidayOptions(db: Database, stationId: string): StationHolidayOptions {
+  const row = db.prepare(`SELECT station_holiday_options_json FROM stations WHERE id = ?`).get(stationId) as
+    | { station_holiday_options_json: string | null }
+    | undefined
+  if (!row?.station_holiday_options_json?.trim()) return {}
+  try {
+    const parsed = JSON.parse(row.station_holiday_options_json) as StationHolidayOptions
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveStationHolidayOptions(db: Database, stationId: string, options: StationHolidayOptions): void {
+  db.prepare(`UPDATE stations SET station_holiday_options_json = ?, updated_at = ? WHERE id = ?`).run(
+    JSON.stringify(options),
+    nowIso(),
+    stationId,
+  )
+}
+
+export type StationHolidaySettingsApi = {
+  federalState: GermanState
+  federalStateLabel: string
+  options: StationHolidayOptions
+}
+
+export function getStationHolidaySettings(db: Database, stationId: string): StationHolidaySettingsApi {
+  const federalState = getStationFederalState(db, stationId)
+  return {
+    federalState,
+    federalStateLabel: GERMAN_STATE_LABELS[federalState],
+    options: getStationHolidayOptions(db, stationId),
+  }
+}
+
+export function updateStationHolidaySettings(
+  db: Database,
+  stationId: string,
+  body: { federalState?: string; options?: StationHolidayOptions },
+): StationHolidaySettingsApi {
+  if (body.federalState != null) {
+    const state = parseGermanState(body.federalState)
+    db.prepare(`UPDATE stations SET federal_state = ?, updated_at = ? WHERE id = ?`).run(state, nowIso(), stationId)
+  }
+  if (body.options != null) {
+    const current = getStationHolidayOptions(db, stationId)
+    saveStationHolidayOptions(db, stationId, { ...current, ...body.options })
+  }
+  return getStationHolidaySettings(db, stationId)
+}
+
+export type RegenerateHolidaysResult = {
+  year: number
+  federalState: GermanState
+  inserted: number
+  removed: number
+  skippedManualOrCustom: number
+  conflicts: string[]
+}
+
+/** Ersetzt systemgenerierte Feiertage eines Jahres; manuelle und Zusatz-Feiertage bleiben. */
+export function regenerateStationHolidays(
+  db: Database,
+  stationId: string,
+  year: number,
+  federalStateInput?: string,
+  preserveManualChanges = true,
+): RegenerateHolidaysResult {
+  const federalState =
+    federalStateInput != null ? parseGermanState(federalStateInput) : getStationFederalState(db, stationId)
+  if (federalStateInput != null) {
+    db.prepare(`UPDATE stations SET federal_state = ?, updated_at = ? WHERE id = ?`).run(federalState, nowIso(), stationId)
+  }
+  const options = getStationHolidayOptions(db, stationId)
+  const templates = getStationHolidaySeedTemplates(federalState, year, options)
+  const yearPrefix = `${year}-`
+
+  const removed = db
+    .prepare(
+      `DELETE FROM station_extra_holidays
+       WHERE station_id = ? AND source = 'statutory' AND date LIKE ?
+       AND (is_manual_override IS NULL OR is_manual_override = 0)`,
+    )
+    .run(stationId, `${yearPrefix}%`).changes
+
+  let inserted = 0
+  let skippedManualOrCustom = 0
+  const conflicts: string[] = []
+  const ts = nowIso()
+
+  const insert = db.prepare(
+    `INSERT INTO station_extra_holidays (
+      id, station_id, date, name, federal_state, is_legal, is_special,
+      counts_as_public, counts_as_special, opening_hours_note, remark, active,
+      payroll_category, reference_percent, all_day, time_start, time_end,
+      source, statutory_template_id, is_manual_override, special_rule_tier,
+      created_at, updated_at, created_by
+    ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, NULL, NULL, 1, ?, ?, ?, ?, ?, 'statutory', ?, 0, ?, ?, ?, NULL)`,
+  )
+
+  for (const t of templates) {
+    const blocked = db
+      .prepare(
+        `SELECT id, source, is_manual_override, name FROM station_extra_holidays
+         WHERE station_id = ? AND date = ? LIMIT 1`,
+      )
+      .get(stationId, t.date) as
+      | { id: string; source: string | null; is_manual_override: number | null; name: string }
+      | undefined
+
+    if (blocked) {
+      if (blocked.source === 'custom' || (preserveManualChanges && (blocked.is_manual_override ?? 0) === 1)) {
+        skippedManualOrCustom += 1
+        continue
+      }
+      if (preserveManualChanges) {
+        conflicts.push(`${t.date}: ${blocked.name}`)
+        skippedManualOrCustom += 1
+        continue
+      }
+    }
+
+    const flags = syncLegacyFlags(t.payrollCategory, t.specialRuleTier ?? null)
+    insert.run(
+      `seh-${randomUUID()}`,
+      stationId,
+      t.date,
+      t.name,
+      federalState,
+      flags.isSpecial,
+      flags.countsAsPublic,
+      flags.countsAsSpecial,
+      t.payrollCategory,
+      t.referencePercent,
+      t.allDay ? 1 : 0,
+      t.timeStart ?? null,
+      t.timeEnd ?? null,
+      t.statutoryTemplateId,
+      t.specialRuleTier ?? null,
+      ts,
+      ts,
+    )
+    inserted += 1
+  }
+
+  return { year, federalState, inserted, removed, skippedManualOrCustom, conflicts }
+}
+
+export function seedStationHolidaysForYears(
+  db: Database,
+  stationId: string,
+  years: number[],
+  federalState?: GermanState,
+): void {
+  for (const year of years) {
+    regenerateStationHolidays(db, stationId, year, federalState, true)
+  }
 }
 
 /** Gesetzliche Feiertage für Station/Jahr anlegen, sofern noch kein Eintrag existiert. */
 export function ensureStationStatutoryHolidaysSeeded(db: Database, stationId: string, year = 2026): void {
   const state = getStationFederalState(db, stationId)
-  const templates = getStationHolidaySeedTemplates(state, year)
+  const options = getStationHolidayOptions(db, stationId)
+  const templates = getStationHolidaySeedTemplates(state, year, options)
   const ts = nowIso()
   const insert = db.prepare(
     `INSERT INTO station_extra_holidays (

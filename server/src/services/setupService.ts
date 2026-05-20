@@ -5,8 +5,14 @@ import { getUserTenantContext, getTenantById } from './tenantService.js'
 import { assertTenantCanWrite } from './subscriptionService.js'
 import { type ShiftTemplateInput, listShiftTemplates, replaceShiftTemplates } from './shiftTemplateService.js'
 import { createEmployee } from './employeeService.js'
+import { parseGermanState, type GermanState } from '../data/germanFederalStates.js'
+import {
+  seedStationHolidaysForYears,
+  updateStationHolidaySettings,
+} from './stationExtraHolidayService.js'
+import type { StationHolidayOptions } from '../data/stationHolidayDefaults.js'
 
-export type SetupWizardStep = 'welcome' | 'shifts' | 'tuv' | 'employee' | 'owner' | 'finish'
+export type SetupWizardStep = 'welcome' | 'federal' | 'shifts' | 'tuv' | 'employee' | 'owner' | 'finish'
 
 export type SetupState = {
   setupCompleted: boolean
@@ -20,7 +26,9 @@ export type SetupState = {
   wizardStep: SetupWizardStep
   canComplete: boolean
   employeeCount: number
+  federalStateSetupCompleted: boolean
   steps: {
+    federal: boolean
     shifts: boolean
     tuv: boolean
     owner: boolean
@@ -34,13 +42,15 @@ type StationOnboardingRow = {
   monthly_tuv_report_enabled: number | null
   owner_as_employee_enabled: number
   setup_owner_answered: number
+  federal_state_setup_completed?: number
 }
 
 function primaryStation(db: Database, tenantId: string): StationOnboardingRow | undefined {
   return db
     .prepare(
       `SELECT id, shift_setup_completed, monthly_tuv_report_enabled,
-              owner_as_employee_enabled, setup_owner_answered
+              owner_as_employee_enabled, setup_owner_answered,
+              COALESCE(federal_state_setup_completed, 1) as federal_state_setup_completed
        FROM stations WHERE tenant_id = ? ORDER BY created_at LIMIT 1`,
     )
     .get(tenantId) as StationOnboardingRow | undefined
@@ -52,6 +62,7 @@ function resolveWizardStep(
 ): SetupWizardStep {
   if (setupCompleted) return 'finish'
   if (!st) return 'welcome'
+  if ((st.federal_state_setup_completed ?? 1) !== 1) return 'federal'
   if (st.shift_setup_completed !== 1) return 'shifts'
   if (st.monthly_tuv_report_enabled == null) return 'tuv'
   if (st.setup_owner_answered !== 1) return 'owner'
@@ -73,7 +84,8 @@ export function getSetupState(db: Database, userId: string): SetupState {
       wizardStep: 'finish',
       canComplete: true,
       employeeCount: 0,
-      steps: { shifts: true, tuv: true, owner: true, complete: true },
+      federalStateSetupCompleted: true,
+      steps: { federal: true, shifts: true, tuv: true, owner: true, complete: true },
     }
   }
   const tenant = getTenantById(db, ctx.tenantId)
@@ -92,7 +104,8 @@ export function getSetupState(db: Database, userId: string): SetupState {
   const shiftSetupCompleted = st?.shift_setup_completed === 1
   const tuvAnswered = st != null && st.monthly_tuv_report_enabled != null
   const ownerAnswered = st?.setup_owner_answered === 1
-  const canComplete = Boolean(shiftSetupCompleted && tuvAnswered && ownerAnswered)
+  const federalStateSetupCompleted = (st?.federal_state_setup_completed ?? 1) === 1
+  const canComplete = Boolean(federalStateSetupCompleted && shiftSetupCompleted && tuvAnswered && ownerAnswered)
 
   return {
     setupCompleted,
@@ -107,13 +120,35 @@ export function getSetupState(db: Database, userId: string): SetupState {
     wizardStep: resolveWizardStep(setupCompleted, st),
     canComplete,
     employeeCount: empCount,
+    federalStateSetupCompleted,
     steps: {
+      federal: federalStateSetupCompleted,
       shifts: shiftSetupCompleted,
       tuv: tuvAnswered,
       owner: ownerAnswered,
       complete: setupCompleted,
     },
   }
+}
+
+export function saveSetupFederalState(
+  db: Database,
+  userId: string,
+  stationId: string,
+  federalState: GermanState,
+  options: StationHolidayOptions = {},
+) {
+  const ctx = getUserTenantContext(db, userId)
+  if (!ctx?.tenantId) throw new Error('Kein Tenant')
+  assertTenantCanWrite(db, ctx.tenantId)
+  const state = parseGermanState(federalState)
+  updateStationHolidaySettings(db, stationId, { federalState: state, options })
+  const y = new Date().getFullYear()
+  seedStationHolidaysForYears(db, stationId, [y, y + 1], state)
+  const ts = nowIso()
+  db.prepare(
+    `UPDATE stations SET federal_state_setup_completed = 1, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+  ).run(ts, stationId, ctx.tenantId)
 }
 
 export function saveSetupShiftTemplates(
